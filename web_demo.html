@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeRide AI - Web Demo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    
+    .header {
+      margin-bottom: 40px;
+    }
+    
+    .header h1 {
+      font-size: 3rem;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .header p {
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+    
+    .demo-section {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 30px;
+      border-radius: 15px;
+      margin: 20px 0;
+      backdrop-filter: blur(10px);
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin: 30px 0;
+    }
+    
+    .feature-card {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .feature-card h3 {
+      margin-top: 0;
+      color: #ffd700;
+    }
+    
+    .btn {
+      background: linear-gradient(45deg, #ff6b6b, #ffa500);
+      color: white;
+      padding: 15px 30px;
+      border: none;
+      border-radius: 25px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      margin: 10px;
+      transition: transform 0.3s ease;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    
+    .status {
+      display: none;
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+    
+    .status.normal { background: rgba(40, 167, 69, 0.3); }
+    .status.warning { background: rgba(255, 193, 7, 0.3); }
+    .status.alert { background: rgba(220, 53, 69, 0.3); }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .stat-item {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    
+    .camera-section {
+      display: none;
+      margin: 20px 0;
+    }
+    
+    #video {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 10px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🚗 SafeRide AI</h1>
+      <p>Advanced Driver Monitoring System - Web Demo</p>
+    </div>
+    
+    <div class="demo-section">
+      <h2>🎯 Enhanced Detection Features</h2>
+      <p>Experience the power of our AI-driven monitoring system with features ported from the advanced car_ai project:</p>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>👁️ Drowsiness Detection</h3>
+          <p>Eye Aspect Ratio (EAR) monitoring with configurable thresholds for early fatigue detection</p>
+        </div>
+        
+        <div class="feature-card">
+          <h3>🎯 Distraction Monitoring</h3>
+          <p>Head pose estimation to detect when drivers look away from the road</p>
+        </div>
+        
+        <div class="feature-card">
+          <h3>😴 Fatigue Analysis</h3>
+          <p>Mouth Aspect Ratio (MAR) detection for yawning and advanced fatigue patterns</p>
+        </div>
+        
+        <div class="feature-card">
+          <h3>🔊 Smart Alerts</h3>
+          <p>Priority-based alert system with cooldowns to prevent notification fatigue</p>
+        </div>
+      </div>
+      
+      <button class="btn" onclick="startDemo()">🚀 Start Demo</button>
+      <button class="btn" onclick="startCameraDemo()">📹 Camera Demo</button>
+      <button class="btn" onclick="stopDemo()">⏹️ Stop</button>
+    </div>
+    
+    <div class="camera-section" id="camera-section">
+      <h3>📹 Camera Feed</h3>
+      <video id="video" autoplay muted></video>
+      <p><small>Camera access required for real-time detection (web browser only supports basic camera access)</small></p>
+    </div>
+    
+    <div class="status" id="status">
+      <span id="status-text">System Ready</span>
+    </div>
+    
+    <div class="demo-section">
+      <h2>📊 Live Statistics</h2>
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-value" id="drowsiness-count">0</div>
+          <div>Drowsiness Alerts</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="distraction-count">0</div>
+          <div>Distraction Alerts</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="fatigue-count">0</div>
+          <div>Fatigue Alerts</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="session-time">0</div>
+          <div>Session Minutes</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="demo-section">
+      <h2>⚙️ Configuration</h2>
+      <p>In the full mobile app, you can configure:</p>
+      <ul style="text-align: left; display: inline-block;">
+        <li>Detection sensitivity thresholds</li>
+        <li>Alert cooldown periods</li>
+        <li>Audio notification settings</li>
+        <li>Visual alert preferences</li>
+        <li>Data logging options</li>
+      </ul>
+    </div>
+    
+    <div class="demo-section">
+      <h2>🚗 In-Car Deployment</h2>
+      <p>The full SafeRide AI app includes:</p>
+      <ul style="text-align: left; display: inline-block;">
+        <li>📱 Mobile app for Android/iOS</li>
+        <li>🔧 Installation guide for vehicle mounting</li>
+        <li>📊 Advanced analytics and reporting</li>
+        <li>🔔 Emergency contact integration</li>
+        <li>🌙 Day/night vision adaptation</li>
+        <li>📈 Long-term behavior analysis</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    let demoInterval;
+    let sessionStartTime;
+    let stats = {
+      drowsiness: 0,
+      distraction: 0,
+      fatigue: 0
+    };
+    
+    function startDemo() {
+      sessionStartTime = Date.now();
+      updateStatus('Demo started - Monitoring active', 'normal');
+      
+      // Simulate detection events
+      demoInterval = setInterval(() => {
+        simulateDetection();
+        updateSessionTime();
+      }, 3000);
+    }
+    
+    function stopDemo() {
+      if (demoInterval) {
+        clearInterval(demoInterval);
+        demoInterval = null;
+      }
+      updateStatus('Demo stopped', 'normal');
+      
+      // Stop camera if running
+      const video = document.getElementById('video');
+      const stream = video.srcObject;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
+      document.getElementById('camera-section').style.display = 'none';
+    }
+    
+    function startCameraDemo() {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          const video = document.getElementById('video');
+          video.srcObject = stream;
+          document.getElementById('camera-section').style.display = 'block';
+          updateStatus('Camera active - Basic feed only (full ML detection available in mobile app)', 'normal');
+        })
+        .catch(err => {
+          updateStatus('Camera access denied or not available', 'warning');
+        });
+    }
+    
+    function simulateDetection() {
+      const events = ['drowsiness', 'distraction', 'fatigue'];
+      const messages = {
+        drowsiness: 'Drowsiness detected - Please take a break',
+        distraction: 'Distraction detected - Keep eyes on road',
+        fatigue: 'Fatigue detected - Consider stopping'
+      };
+      
+      // 20% chance of detection event
+      if (Math.random() < 0.2) {
+        const event = events[Math.floor(Math.random() * events.length)];
+        stats[event]++;
+        updateStats();
+        updateStatus(messages[event], 'alert');
+        
+        // Speak alert if available
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(messages[event]);
+          speechSynthesis.speak(utterance);
+        }
+        
+        // Return to normal after 2 seconds
+        setTimeout(() => {
+          updateStatus('Monitoring - Normal driving state', 'normal');
+        }, 2000);
+      } else {
+        updateStatus('Monitoring - Normal driving state', 'normal');
+      }
+    }
+    
+    function updateStatus(text, type) {
+      const status = document.getElementById('status');
+      const statusText = document.getElementById('status-text');
+      status.className = `status ${type}`;
+      statusText.textContent = text;
+      status.style.display = 'block';
+    }
+    
+    function updateStats() {
+      document.getElementById('drowsiness-count').textContent = stats.drowsiness;
+      document.getElementById('distraction-count').textContent = stats.distraction;
+      document.getElementById('fatigue-count').textContent = stats.fatigue;
+    }
+    
+    function updateSessionTime() {
+      if (sessionStartTime) {
+        const minutes = Math.floor((Date.now() - sessionStartTime) / 60000);
+        document.getElementById('session-time').textContent = minutes;
+      }
+    }
+  </script>
+</body>
+</html>
