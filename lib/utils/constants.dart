@@ -42,11 +42,19 @@ class AppConstants {
   static const int cameraFPS = 15;
   static const ResolutionPreset cameraResolution = ResolutionPreset.medium;
   
-  // UI constants
-  static const Color primaryColor = Color(0xFF2196F3);
-  static const Color warningColor = Color(0xFFFFA000);
-  static const Color dangerColor = Color(0xFFE53935);
-  static const Color successColor = Color(0xFF4CAF50);
+  // UI constants - Dark theme colors
+  static const Color primaryColor = Color(0xFF3B82F6);
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color dangerColor = Color(0xFFEF4444);
+  static const Color successColor = Color(0xFF10B981);
+  
+  // Additional UI colors for modern design
+  static const Color backgroundDark = Color(0xFF0A0E1A);
+  static const Color surfaceDark = Color(0xFF1E2A3A);
+  static const Color borderColor = Color(0xFF374151);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFD1D5DB);
+  static const Color textMuted = Color(0xFF9CA3AF);
 }
 
 // Enum for the different types of detections

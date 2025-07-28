@@ -3,15 +3,23 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import '../services/streaming_service.dart';
 
 class CameraService extends ChangeNotifier {
   CameraController? cameraController;
   List<CameraDescription> cameras = [];
   bool isInitialized = false;
   bool isProcessing = false;
-  StreamController<InputImage> imageStreamController = StreamController<InputImage>();
+  StreamController<InputImage>? _imageStreamController;
+  final StreamingService _streamingService = StreamingService();
   
-  Stream<InputImage> get imageStream => imageStreamController.stream;
+  Stream<InputImage> get imageStream {
+    // Create a new stream controller if one doesn't exist or is closed
+    if (_imageStreamController == null || _imageStreamController!.isClosed) {
+      _imageStreamController = StreamController<InputImage>.broadcast();
+    }
+    return _imageStreamController!.stream;
+  }
   
   Future<void> initialize() async {
     try {
@@ -60,9 +68,16 @@ class CameraService extends ChangeNotifier {
       
       isProcessing = true;
       
+      // Send frame to streaming service for live viewing
+      _streamingService.addFrame(image);
+      
       final inputImage = _convertCameraImageToInputImage(image);
       if (inputImage != null) {
-        imageStreamController.add(inputImage);
+        // Create a new stream controller if needed
+        if (_imageStreamController == null || _imageStreamController!.isClosed) {
+          _imageStreamController = StreamController<InputImage>.broadcast();
+        }
+        _imageStreamController!.add(inputImage);
       }
       
       isProcessing = false;
@@ -80,10 +95,34 @@ class CameraService extends ChangeNotifier {
     debugPrint('Camera image stream stopped');
   }
   
+  Future<void> resetImageStream() async {
+    // Close the existing stream controller if it exists
+    if (_imageStreamController != null && !_imageStreamController!.isClosed) {
+      await _imageStreamController!.close();
+    }
+    // Create a new broadcast stream controller
+    _imageStreamController = StreamController<InputImage>.broadcast();
+    debugPrint('Camera image stream reset');
+  }
+  
+  // Streaming control methods
+  Future<String?> startLiveStreaming() async {
+    return await _streamingService.startStreaming();
+  }
+  
+  Future<void> stopLiveStreaming() async {
+    await _streamingService.stopStreaming();
+  }
+  
+  bool get isStreaming => _streamingService.isStreaming;
+  String? get streamingUrl => _streamingService.serverUrl;
+  
   @override
   Future<void> dispose() async {
     await stopImageStream();
-    await imageStreamController.close();
+    await stopLiveStreaming();
+    await _imageStreamController?.close();
+    _imageStreamController = null;
     await cameraController?.dispose();
     isInitialized = false;
     super.dispose();

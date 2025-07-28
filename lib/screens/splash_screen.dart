@@ -76,61 +76,114 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).primaryColor,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // App logo or icon
-            const Icon(
-              Icons.car_crash_outlined,
-              size: 80.0,
-              color: Colors.white,
-            ),
-            
-            const SizedBox(height: 20.0),
-            
-            // App name
-            const Text(
-              AppConstants.appName,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28.0,
-                fontWeight: FontWeight.bold,
+      backgroundColor: AppConstants.backgroundDark,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppConstants.backgroundDark,
+              Color(0xFF1E3A8A),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // App logo with modern styling
+              Container(
+                padding: const EdgeInsets.all(24.0),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(24.0),
+                  border: Border.all(
+                    color: AppConstants.primaryColor.withOpacity(0.3),
+                    width: 2.0,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.shield_outlined,
+                  size: 80.0,
+                  color: AppConstants.primaryColor,
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 10.0),
-            
-            // Tagline
-            const Text(
-              'Safer journeys with AI-powered monitoring',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 16.0,
+              
+              const SizedBox(height: 32.0),
+              
+              // App name with enhanced typography
+              const Text(
+                AppConstants.appName,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32.0,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-            
-            const SizedBox(height: 40.0),
-            
-            // Loading spinner
-            const SpinKitDoubleBounce(
-              color: Colors.white,
-              size: 50.0,
-            ),
-            
-            const SizedBox(height: 20.0),
-            
-            // Status text
-            Text(
-              _isFirstRun ? 'Setting up...' : 'Loading...',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 16.0,
+              
+              const SizedBox(height: 12.0),
+              
+              // Tagline with better styling
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                child: const Text(
+                  'Safer journeys with AI-powered monitoring',
+                  style: TextStyle(
+                    color: AppConstants.textSecondary,
+                    fontSize: 16.0,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-          ],
+              
+              const SizedBox(height: 64.0),
+              
+              // Modern loading indicator
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: AppConstants.surfaceDark,
+                  borderRadius: BorderRadius.circular(16.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20.0,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: const SpinKitDoubleBounce(
+                  color: AppConstants.primaryColor,
+                  size: 50.0,
+                ),
+              ),
+              
+              const SizedBox(height: 24.0),
+              
+              // Status text with enhanced styling
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+                child: Text(
+                  _isFirstRun ? 'Setting up permissions...' : 'Loading application...',
+                  style: const TextStyle(
+                    color: AppConstants.primaryColor,
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -4,8 +4,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:provider/provider.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'package:saferide_ai_app/screens/settings_screen.dart';
 import 'package:saferide_ai_app/screens/installation_guide_screen.dart';
 import 'package:saferide_ai_app/services/camera_service.dart';
@@ -29,9 +27,13 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
   
   // Video recording variables
   bool _isRecording = false;
-  String? _currentVideoPath;
   DateTime? _recordingStartTime;
   Timer? _recordingTimer;
+  
+  // Live streaming variables
+  bool _isStreaming = false;
+  String? _streamingUrl;
+  bool _isRestartingServices = false;
   
   @override
   void initState() {
@@ -93,6 +95,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
     // Start the camera AFTER subscription is ready
     cameraService.startImageStream();
     
+    // Start live streaming automatically when monitoring starts
+    _startLiveStreaming();
+    
     // Keep screen on while monitoring
     WakelockPlus.enable();
   }
@@ -118,6 +123,9 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
       _stopVideoRecording();
     }
     
+    // Stop live streaming
+    _stopLiveStreaming();
+    
     // Stop the camera
     cameraService.stopImageStream();
     
@@ -138,16 +146,10 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
     try {
       final cameraService = Provider.of<CameraService>(context, listen: false);
       
-      // Generate unique filename with timestamp
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final directory = await getApplicationDocumentsDirectory();
-      final videoPath = path.join(directory.path, 'saferide_recording_$timestamp.mp4');
-      
       await cameraService.cameraController?.startVideoRecording();
       
       setState(() {
         _isRecording = true;
-        _currentVideoPath = videoPath;
         _recordingStartTime = DateTime.now();
       });
       
@@ -245,6 +247,142 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
   
+  // Live streaming methods
+  Future<void> _startLiveStreaming() async {
+    if (_isStreaming) return;
+    
+    try {
+      final cameraService = Provider.of<CameraService>(context, listen: false);
+      
+      // Stop any existing streaming first
+      await cameraService.stopLiveStreaming();
+      await Future.delayed(const Duration(milliseconds: 500)); // Small delay to ensure cleanup
+      
+      final url = await cameraService.startLiveStreaming();
+      
+      if (url != null) {
+        setState(() {
+          _isStreaming = true;
+          _streamingUrl = url;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.live_tv, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Live streaming started!',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Access at: $url',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF10B981),
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Copy',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Copy URL to clipboard
+                  debugPrint('Copy URL to clipboard: $url');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('URL copied: $url'),
+                        backgroundColor: const Color(0xFF10B981),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          );
+        }
+        
+        debugPrint('🌐 Live streaming started at: $url');
+      } else {
+        setState(() {
+          _isStreaming = false;
+          _streamingUrl = null;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Failed to start live streaming'),
+                ],
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isStreaming = false;
+        _streamingUrl = null;
+      });
+      
+      debugPrint('❌ Error starting live streaming: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Streaming error: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _startLiveStreaming(),
+            ),
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _stopLiveStreaming() async {
+    if (!_isStreaming) return;
+    
+    try {
+      final cameraService = Provider.of<CameraService>(context, listen: false);
+      await cameraService.stopLiveStreaming();
+      
+      setState(() {
+        _isStreaming = false;
+        _streamingUrl = null;
+      });
+      
+      debugPrint('🔴 Live streaming stopped');
+    } catch (e) {
+      debugPrint('❌ Error stopping live streaming: $e');
+    }
+  }
+  
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -254,13 +392,163 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
-        _stopMonitoring();
+        // Don't stop monitoring completely, just pause some services
+        debugPrint('📱 App went to background - preserving monitoring state');
         break;
       case AppLifecycleState.resumed:
-        // Don't automatically restart, let the user decide
+        debugPrint('📱 App resumed - checking and restarting services');
+        // Restart services if monitoring was active
+        if (_isMonitoring) {
+          _restartServicesIfNeeded();
+        }
         break;
       default:
         break;
+    }
+  }
+  
+  Future<void> _restartServicesIfNeeded() async {
+    if (_isRestartingServices) return; // Prevent multiple restart attempts
+    
+    setState(() {
+      _isRestartingServices = true;
+    });
+    
+    final cameraService = Provider.of<CameraService>(context, listen: false);
+    final detectionService = Provider.of<DetectionService>(context, listen: false);
+    
+    try {
+      debugPrint('🔄 Starting service restart...');
+      
+      // First, properly cleanup existing subscriptions and streams
+      debugPrint('🔄 Cleaning up existing subscriptions...');
+      _imageStreamSubscription?.cancel();
+      _imageStreamSubscription = null;
+      
+      // Stop camera stream if running
+      if (cameraService.isInitialized && 
+          cameraService.cameraController != null && 
+          cameraService.cameraController!.value.isStreamingImages) {
+        debugPrint('🔄 Stopping existing camera stream...');
+        await cameraService.stopImageStream();
+        await Future.delayed(const Duration(milliseconds: 500)); // Allow cleanup
+      }
+      
+      // Stop streaming if active
+      if (cameraService.isStreaming) {
+        debugPrint('🔄 Stopping existing live streaming...');
+        await cameraService.stopLiveStreaming();
+        await Future.delayed(const Duration(milliseconds: 500)); // Allow cleanup
+      }
+      
+      // Check and reinitialize camera if needed
+      if (!cameraService.isInitialized) {
+        debugPrint('🔄 Reinitializing camera service...');
+        await cameraService.initialize();
+        await Future.delayed(const Duration(milliseconds: 300)); // Allow initialization
+      }
+      
+      // Restart detection service if not running
+      if (!detectionService.isRunning) {
+        debugPrint('🔄 Restarting detection service...');
+        detectionService.startDetection();
+      }
+      
+      // Now restart camera stream with fresh subscription
+      if (cameraService.isInitialized) {
+        debugPrint('🔄 Resetting camera image stream...');
+        
+        // Reset the image stream to create a fresh stream controller
+        await cameraService.resetImageStream();
+        
+        debugPrint('🔄 Creating fresh image stream subscription...');
+        
+        // Create a new subscription to the image stream
+        _imageStreamSubscription = cameraService.imageStream.listen(
+          (inputImage) {
+            debugPrint('📸 Image received by monitoring screen, passing to detection service');
+            detectionService.processImage(inputImage);
+          },
+          onError: (error) {
+            debugPrint('❌ Error in image stream subscription: $error');
+          },
+          onDone: () {
+            debugPrint('🔚 Image stream subscription ended');
+          },
+        );
+        
+        debugPrint('🔄 Starting camera image stream...');
+        await cameraService.startImageStream();
+        await Future.delayed(const Duration(milliseconds: 500)); // Allow stream to start
+      }
+      
+      // Restart live streaming if monitoring is active
+      if (_isMonitoring) {
+        debugPrint('🔄 Restarting live streaming...');
+        await _startLiveStreaming();
+      }
+      
+      setState(() {
+        _isRestartingServices = false;
+      });
+      
+      debugPrint('✅ All services restarted successfully');
+      
+      // Show success notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'All monitoring services restored!',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            backgroundColor: Color(0xFF10B981),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      setState(() {
+        _isRestartingServices = false;
+      });
+      
+      debugPrint('❌ Error restarting services: $e');
+      
+      // Show user notification about the issue
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Failed to restart services. Try manually.',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () {
+                _restartServicesIfNeeded();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
   
@@ -280,245 +568,690 @@ class _MonitoringScreenState extends State<MonitoringScreen> with WidgetsBinding
     final detectionService = Provider.of<DetectionService>(context);
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppConstants.appName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const InstallationGuideScreen(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const SettingsScreen(),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
+      backgroundColor: const Color(0xFF0A0E1A), // Dark blue background
+      body: Stack(
         children: [
-          // Camera preview
-          Expanded(
-            flex: 3,
-            child: Center(
-              child: cameraService.isInitialized
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12.0),
-                      child: CameraPreview(cameraService.cameraController!),
-                    )
-                  : const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-            ),
-          ),
-          
-          // Alert Banner
-          if (detectionService.currentAlert != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              color: AppConstants.dangerColor,
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.warning,
-                    color: Colors.white,
-                    size: 24.0,
-                  ),
-                  const SizedBox(width: 12.0),
-                  Expanded(
-                    child: Text(
-                      detectionService.currentAlert!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Status and controls
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Status indicator
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8.0,
-                      horizontal: 16.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _isMonitoring 
-                          ? AppConstants.successColor 
-                          : _isWaitingToStart 
-                              ? AppConstants.warningColor 
-                              : Colors.grey,
-                      borderRadius: BorderRadius.circular(20.0),
-                    ),
-                    child: Text(
-                      _isMonitoring 
-                          ? 'Monitoring Active' 
-                          : _isWaitingToStart 
-                              ? 'Starting in ${_countdownSeconds}s...'
-                              : 'Monitoring Inactive',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 20.0),
-                  
-                  // Countdown display when waiting to start
-                  if (_isWaitingToStart)
-                    Column(
-                      children: [
-                        const Icon(
-                          Icons.timer,
-                          size: 48.0,
-                          color: AppConstants.warningColor,
-                        ),
-                        const SizedBox(height: 12.0),
-                        Text(
-                          'Monitoring will start in:',
-                          style: TextStyle(
-                            fontSize: 16.0,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8.0),
-                        Text(
-                          '${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            fontSize: 32.0,
-                            fontWeight: FontWeight.bold,
-                            color: AppConstants.warningColor,
-                          ),
-                        ),
-                        const SizedBox(height: 8.0),
-                        Text(
-                          'This delay ensures proper setup time',
-                          style: TextStyle(
-                            fontSize: 14.0,
-                            color: Colors.grey[500],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                        const SizedBox(height: 20.0),
-                      ],
-                    ),
-                  
-                  const SizedBox(height: 20.0),
-                  
-                  // Video recording controls
-                  if (_isMonitoring) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16.0),
-                      decoration: BoxDecoration(
-                        color: _isRecording ? Colors.red.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12.0),
-                        border: Border.all(
-                          color: _isRecording ? Colors.red : Colors.grey,
-                          width: 2.0,
-                        ),
-                      ),
+          // Full screen camera preview - fills entire screen including status bar
+          Positioned.fill(
+            child: cameraService.isInitialized
+                ? CameraPreview(cameraService.cameraController!)
+                : Container(
+                    color: const Color(0xFF1E2A3A),
+                    child: const Center(
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _isRecording ? Icons.videocam : Icons.videocam_off,
-                                color: _isRecording ? Colors.red : Colors.grey,
-                                size: 24.0,
-                              ),
-                              const SizedBox(width: 8.0),
-                              Text(
-                                _isRecording ? 'Recording Active' : 'Recording Inactive',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: _isRecording ? Colors.red : Colors.grey,
-                                ),
-                              ),
-                            ],
+                          CircularProgressIndicator(
+                            color: Color(0xFF3B82F6),
+                            strokeWidth: 3.0,
                           ),
-                          if (_isRecording) ...[
-                            const SizedBox(height: 8.0),
-                            Text(
-                              _formatRecordingDuration(),
-                              style: const TextStyle(
-                                fontSize: 18.0,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 12.0),
-                          ElevatedButton.icon(
-                            onPressed: _isRecording ? _stopVideoRecording : _startVideoRecording,
-                            icon: Icon(_isRecording ? Icons.stop : Icons.videocam),
-                            label: Text(_isRecording ? 'Stop Recording' : 'Start Recording'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isRecording ? Colors.red : Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24.0,
-                                vertical: 12.0,
-                              ),
+                          SizedBox(height: 16.0),
+                          Text(
+                            'Initializing Camera...',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16.0,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20.0),
+                  ),
+          ),
+          
+          // Top overlay with app bar and status indicators - positioned at very top
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top, // Status bar height
+                left: 12.0,
+                right: 12.0,
+                bottom: 12.0,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.7),
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
                   ],
-                  
-                  // Start/Stop button
-                  ElevatedButton(
-                    onPressed: cameraService.isInitialized
-                        ? ((_isMonitoring || _isWaitingToStart) ? _stopMonitoring : _startMonitoring)
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: (_isMonitoring || _isWaitingToStart)
-                          ? Colors.red
-                          : Theme.of(context).primaryColor,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32.0,
-                        vertical: 16.0,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // App bar content
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        child: const Icon(
+                          Icons.shield_outlined,
+                          color: Colors.white,
+                          size: 20.0,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      (_isMonitoring || _isWaitingToStart) 
-                          ? 'Stop Monitoring' 
-                          : 'Start Monitoring',
-                      style: const TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 12.0),
+                      const Expanded(
+                        child: Text(
+                          AppConstants.appName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18.0,
+                          ),
+                        ),
                       ),
-                    ),
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          child: const Icon(
+                            Icons.help_outline,
+                            color: Colors.white,
+                            size: 18.0,
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const InstallationGuideScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 4.0),
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          child: const Icon(
+                            Icons.settings,
+                            color: Colors.white,
+                            size: 18.0,
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12.0),
+                  // Status indicators row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Status indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0,
+                          vertical: 4.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (_isMonitoring 
+                              ? const Color(0xFF10B981) 
+                              : _isWaitingToStart 
+                                  ? const Color(0xFFF59E0B) 
+                                  : const Color(0xFF6B7280)
+                          ).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(12.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 6.0,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6.0,
+                              height: 6.0,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(3.0),
+                              ),
+                            ),
+                            const SizedBox(width: 6.0),
+                            Text(
+                              _isMonitoring 
+                                  ? 'ACTIVE' 
+                                  : _isWaitingToStart 
+                                      ? 'STARTING...'
+                                      : 'INACTIVE',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      Row(
+                        children: [
+                          // Live streaming indicator with URL display
+                          if (_isStreaming || _isRestartingServices)
+                            GestureDetector(
+                              onTap: _isStreaming && _streamingUrl != null ? () {
+                                // Show streaming URL dialog
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: const Color(0xFF1E2A3A),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.live_tv, color: Color(0xFF3B82F6)),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Live Stream URL',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Share this URL to view the live stream:',
+                                          style: TextStyle(color: Colors.white70),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF0A0E1A),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFF3B82F6)),
+                                          ),
+                                          child: Text(
+                                            _streamingUrl!,
+                                            style: const TextStyle(
+                                              color: Color(0xFF3B82F6),
+                                              fontFamily: 'monospace',
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          '• Open this URL in any web browser\n• Make sure you\'re on the same WiFi network\n• Works on phones, tablets, or computers',
+                                          style: TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text(
+                                          'Close',
+                                          style: TextStyle(color: Colors.white70),
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          debugPrint('Copy URL to clipboard: $_streamingUrl');
+                                          Navigator.of(context).pop();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('URL copied: $_streamingUrl'),
+                                              backgroundColor: const Color(0xFF10B981),
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF3B82F6),
+                                        ),
+                                        child: const Text(
+                                          'Copy URL',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              } : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0,
+                                  vertical: 4.0,
+                                ),
+                                margin: const EdgeInsets.only(right: 8.0),
+                                decoration: BoxDecoration(
+                                  color: (_isRestartingServices 
+                                      ? const Color(0xFFF59E0B) 
+                                      : const Color(0xFF3B82F6)
+                                  ).withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(12.0),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 6.0,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6.0,
+                                      height: 6.0,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(3.0),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6.0),
+                                    Text(
+                                      _isRestartingServices ? 'RESTARTING' : 'LIVE',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10.0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),                          // Recording indicator
+                          if (_isRecording)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8.0,
+                                vertical: 4.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 6.0,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6.0,
+                                    height: 6.0,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(3.0),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6.0),
+                                  Text(
+                                    'REC ${_formatRecordingDuration()}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
+          
+          // Alert Banner - positioned below the top overlay
+          if (detectionService.currentAlert != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 120.0, // Status bar + overlay height
+              left: 12.0,
+              right: 12.0,
+              child: Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFEF4444).withOpacity(0.4),
+                      blurRadius: 15.0,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6.0),
+                      ),
+                      child: const Icon(
+                        Icons.warning_rounded,
+                        color: Colors.white,
+                        size: 20.0,
+                      ),
+                    ),
+                    const SizedBox(width: 12.0),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'SAFETY ALERT',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2.0),
+                          Text(
+                            detectionService.currentAlert!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          
+          // Bottom overlay with controls - only show countdown when waiting to start
+          if (_isWaitingToStart)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.8),
+                      Colors.black.withOpacity(0.4),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Countdown display when waiting to start
+                        Container(
+                          padding: const EdgeInsets.all(20.0),
+                          margin: const EdgeInsets.only(bottom: 20.0),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E2A3A).withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(16.0),
+                            border: Border.all(
+                              color: const Color(0xFFF59E0B),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFF59E0B).withOpacity(0.3),
+                                blurRadius: 15.0,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12.0),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(40.0),
+                                ),
+                                child: const Icon(
+                                  Icons.timer_outlined,
+                                  size: 32.0,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                              const SizedBox(height: 12.0),
+                              const Text(
+                                'Monitoring will start in:',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 6.0),
+                              Text(
+                                '${(_countdownSeconds ~/ 60).toString().padLeft(2, '0')}:${(_countdownSeconds % 60).toString().padLeft(2, '0')}',
+                                style: const TextStyle(
+                                  fontSize: 36.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                              const SizedBox(height: 6.0),
+                              Text(
+                                'This delay ensures proper setup time',
+                                style: TextStyle(
+                                  fontSize: 12.0,
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          
+          // Floating start button when monitoring is not active and not waiting to start
+          if (!_isMonitoring && !_isWaitingToStart)
+            Positioned(
+              bottom: 30.0,
+              right: 20.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6),
+                  borderRadius: BorderRadius.circular(28.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15.0,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28.0),
+                    onTap: cameraService.isInitialized ? _startMonitoring : null,
+                    child: Container(
+                      width: 56.0,
+                      height: 56.0,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28.0),
+                      ),
+                      child: const Icon(
+                        Icons.play_circle_outlined,
+                        color: Colors.white,
+                        size: 24.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          
+          // Floating stop button when monitoring is active - positioned above recording button
+          if (_isMonitoring && !_isWaitingToStart)
+            Positioned(
+              bottom: 100.0, // Above the recording button
+              right: 20.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444),
+                  borderRadius: BorderRadius.circular(28.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15.0,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28.0),
+                    onTap: _stopMonitoring,
+                    child: Container(
+                      width: 56.0,
+                      height: 56.0,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28.0),
+                      ),
+                      child: const Icon(
+                        Icons.stop_circle_outlined,
+                        color: Colors.white,
+                        size: 24.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          
+          // Floating recording button when monitoring is active
+          if (_isMonitoring && !_isWaitingToStart)
+            Positioned(
+              bottom: 30.0,
+              right: 20.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _isRecording 
+                      ? const Color(0xFFEF4444)
+                      : const Color(0xFF10B981),
+                  borderRadius: BorderRadius.circular(28.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15.0,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28.0),
+                    onTap: _isRecording ? _stopVideoRecording : _startVideoRecording,
+                    child: Container(
+                      width: 56.0,
+                      height: 56.0,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28.0),
+                      ),
+                      child: Icon(
+                        _isRecording ? Icons.stop : Icons.videocam,
+                        color: Colors.white,
+                        size: 24.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          
+          // Floating restart streaming button - positioned to the left of record button when streaming is not active during monitoring
+          if (_isMonitoring && !_isWaitingToStart && !_isStreaming && !_isRestartingServices)
+            Positioned(
+              bottom: 30.0,
+              right: 90.0, // To the left of the recording button
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6),
+                  borderRadius: BorderRadius.circular(28.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15.0,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28.0),
+                    onTap: () {
+                      _restartServicesIfNeeded();
+                    },
+                    child: Container(
+                      width: 56.0,
+                      height: 56.0,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28.0),
+                      ),
+                      child: const Icon(
+                        Icons.live_tv,
+                        color: Colors.white,
+                        size: 24.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
