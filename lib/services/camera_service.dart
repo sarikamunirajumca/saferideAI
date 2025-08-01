@@ -13,6 +13,12 @@ class CameraService extends ChangeNotifier {
   StreamController<InputImage>? _imageStreamController;
   final StreamingService _streamingService = StreamingService();
   
+  // Frame skipping variables for performance optimization
+  int _frameCount = 0;
+  static const int _frameSkipCount = 1; // Process every 2nd frame for detection (reduced from 3)
+  DateTime? _lastFrameProcessTime;
+  static const int _minFrameInterval = 200; // Minimum 200ms between detection frames (reduced from 300ms)
+  
   Stream<InputImage> get imageStream {
     // Create a new stream controller if one doesn't exist or is closed
     if (_imageStreamController == null || _imageStreamController!.isClosed) {
@@ -37,12 +43,21 @@ class CameraService extends ChangeNotifier {
       
       cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.medium, // Higher resolution for better face detection
+        ResolutionPreset.low, // Reduced resolution for faster streaming performance
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.nv21, // Force NV21 format
+        imageFormatGroup: ImageFormatGroup.yuv420, // Use device's native format for compatibility
       );
       
       await cameraController!.initialize();
+      
+      // Additional camera settings for optimal performance and color
+      await cameraController!.setFocusMode(FocusMode.auto);
+      await cameraController!.setFlashMode(FlashMode.off);
+      
+      // Verify camera format after initialization
+      debugPrint('✅ Camera initialized with format: ${cameraController!.description.lensDirection}');
+      debugPrint('📸 Camera settings - Resolution: ${ResolutionPreset.low}, Format: YUV420 (optimized for streaming)');
+      debugPrint('🎥 Camera details - Name: ${frontCamera.name}, Sensor orientation: ${frontCamera.sensorOrientation}');
       isInitialized = true;
       notifyListeners();
       
@@ -64,26 +79,59 @@ class CameraService extends ChangeNotifier {
     }
     
     await cameraController!.startImageStream((CameraImage image) {
-      if (isProcessing) return;
-      
-      isProcessing = true;
-      
-      // Send frame to streaming service for live viewing
-      _streamingService.addFrame(image);
-      
-      final inputImage = _convertCameraImageToInputImage(image);
-      if (inputImage != null) {
-        // Create a new stream controller if needed
-        if (_imageStreamController == null || _imageStreamController!.isClosed) {
-          _imageStreamController = StreamController<InputImage>.broadcast();
-        }
-        _imageStreamController!.add(inputImage);
-      }
-      
-      isProcessing = false;
+      // Process frames asynchronously to avoid blocking
+      _processFrameAsync(image);
     });
     
     debugPrint('Camera image stream started');
+  }
+  
+  // Process frames asynchronously to improve performance
+  void _processFrameAsync(CameraImage image) async {
+    // Skip processing if already busy (non-blocking approach)
+    if (isProcessing) return;
+    
+    isProcessing = true;
+    
+    try {
+      // Always send frame to streaming service for live view (every frame)
+      _streamingService.addFrame(image);
+      
+      // Frame skipping logic for detection processing (performance optimization)
+      _frameCount++;
+      final now = DateTime.now();
+      
+      // Skip frames for detection processing to improve performance
+      bool shouldProcessForDetection = false;
+      
+      // Method 1: Frame count based skipping (process every Nth frame)
+      if (_frameCount % (_frameSkipCount + 1) == 0) {
+        shouldProcessForDetection = true;
+      }
+      
+      // Method 2: Time-based skipping (minimum interval between detection frames)
+      if (_lastFrameProcessTime != null && 
+          now.difference(_lastFrameProcessTime!).inMilliseconds < _minFrameInterval) {
+        shouldProcessForDetection = false;
+      }
+      
+      if (shouldProcessForDetection) {
+        // Process for detection service (lower priority, with frame skipping)
+        final inputImage = _convertCameraImageToInputImage(image);
+        if (inputImage != null) {
+          // Create a new stream controller if needed
+          if (_imageStreamController == null || _imageStreamController!.isClosed) {
+            _imageStreamController = StreamController<InputImage>.broadcast();
+          }
+          _imageStreamController!.add(inputImage);
+          _lastFrameProcessTime = now;
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error processing frame: $e');
+    } finally {
+      isProcessing = false;
+    }
   }
   
   Future<void> stopImageStream() async {

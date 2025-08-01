@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -31,6 +32,10 @@ class DetectionService extends ChangeNotifier {
   DateTime? lastYawningAlert;
   DateTime? lastMotionSicknessAlert;
   
+  // Web demo mode for testing voice alerts
+  Timer? _webDemoTimer;
+  int _webDemoCounter = 0;
+  
   // Face position tracking for improved distraction detection
   Rect? _lastFacePosition;
   List<Rect> _facePositionHistory = [];
@@ -45,14 +50,14 @@ class DetectionService extends ChangeNotifier {
   DateTime? lastSmokingAlert;
   DateTime? lastErraticMovementAlert;
   
-  // Detection settings
+  // Detection settings - Enable more features by default for better functionality
   bool isDrowsinessDetectionEnabled = true;
   bool isDistractionDetectionEnabled = true;
   bool isSeatbeltDetectionEnabled = true;
   bool isYawningDetectionEnabled = true;
   bool isPassengerMonitoringEnabled = true;
-  bool isMotionSicknessDetectionEnabled = false;
-  bool isPhoneUsageDetectionEnabled = false;
+  bool isMotionSicknessDetectionEnabled = true; // Enable by default
+  bool isPhoneUsageDetectionEnabled = true; // Enable by default
   bool isSmokingDetectionEnabled = false;
   bool isErraticMovementDetectionEnabled = true;
   
@@ -77,17 +82,25 @@ class DetectionService extends ChangeNotifier {
   Future<void> _initializeTTS() async {
     try {
       await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.8);
+      await _flutterTts.setSpeechRate(0.6); // Slower speech for clarity
       await _flutterTts.setVolume(1.0);
-      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setPitch(1.2); // Higher pitch for urgency
       
       _flutterTts.setCompletionHandler(() {
         _isSpeaking = false;
+        _isVoiceAlertInProgress = false;
+        debugPrint('🎤 TTS completion handler called');
       });
       
-      debugPrint('TTS initialized successfully');
+      _flutterTts.setErrorHandler((msg) {
+        _isSpeaking = false;
+        _isVoiceAlertInProgress = false;
+        debugPrint('❌ TTS error: $msg');
+      });
+      
+      debugPrint('✅ TTS initialized successfully with enhanced settings');
     } catch (e) {
-      debugPrint('TTS initialization failed: $e');
+      debugPrint('❌ TTS initialization failed: $e');
     }
   }
   
@@ -99,11 +112,20 @@ class DetectionService extends ChangeNotifier {
     isSeatbeltDetectionEnabled = prefs.getBool(PreferenceKeys.isSeatbeltDetectionEnabled) ?? true;
     isYawningDetectionEnabled = prefs.getBool(PreferenceKeys.isYawningDetectionEnabled) ?? true;
     isPassengerMonitoringEnabled = prefs.getBool(PreferenceKeys.isPassengerMonitoringEnabled) ?? true;
-    isMotionSicknessDetectionEnabled = prefs.getBool(PreferenceKeys.isMotionSicknessDetectionEnabled) ?? false;
-    isPhoneUsageDetectionEnabled = prefs.getBool(PreferenceKeys.isPhoneUsageDetectionEnabled) ?? false;
+    isMotionSicknessDetectionEnabled = prefs.getBool(PreferenceKeys.isMotionSicknessDetectionEnabled) ?? true; // Enable by default
+    isPhoneUsageDetectionEnabled = prefs.getBool(PreferenceKeys.isPhoneUsageDetectionEnabled) ?? true; // Enable by default
     isSmokingDetectionEnabled = prefs.getBool(PreferenceKeys.isSmokingDetectionEnabled) ?? false;
     isErraticMovementDetectionEnabled = prefs.getBool(PreferenceKeys.isErraticMovementDetectionEnabled) ?? true;
     isVoiceAlertsEnabled = prefs.getBool(PreferenceKeys.isVoiceAlertsEnabled) ?? true;
+    
+    debugPrint('🔧 Detection settings loaded:');
+    debugPrint('  - Drowsiness: $isDrowsinessDetectionEnabled');
+    debugPrint('  - Distraction: $isDistractionDetectionEnabled');
+    debugPrint('  - Yawning: $isYawningDetectionEnabled');
+    debugPrint('  - Motion Sickness: $isMotionSicknessDetectionEnabled');
+    debugPrint('  - Phone Usage: $isPhoneUsageDetectionEnabled');
+    debugPrint('  - Erratic Movement: $isErraticMovementDetectionEnabled');
+    debugPrint('  - Voice Alerts: $isVoiceAlertsEnabled');
     
     notifyListeners();
   }
@@ -138,39 +160,41 @@ class DetectionService extends ChangeNotifier {
     }
     _lastImageProcessTime = now;
     
-    debugPrint('⏰ Processing image... Running: $isRunning, Test alert triggered: $_hasTriggeredTestAlert');
+    // Reduced logging frequency to improve performance (every 5 seconds)
+    if (DateTime.now().millisecondsSinceEpoch % 5000 < 100) {
+      debugPrint('⏰ Processing image... Running: $isRunning');
+    }
     
-    // Trigger test alert only once when detection starts
-    if (!_hasTriggeredTestAlert) {
-      debugPrint('🚀 Triggering test alert...');
-      _hasTriggeredTestAlert = true;
-      _showAlert("Detection started! Voice alerts are working!");
-      return;
+    // Test alert disabled for performance optimization
+    // if (!_hasTriggeredTestAlert) {
+    //   debugPrint('🚀 Triggering test alert...');
+    //   _hasTriggeredTestAlert = true;
+    //   _showAlert("Detection started! Voice alerts are working!");
+    //   
+    //   // Start web demo mode for voice alert testing
+    //   if (kIsWeb) {
+    //     _startWebDemoMode();
+    //   }
+    //   return;
+    // }
+    
+    // Web demo mode - simulate alerts for testing voice system
+    if (kIsWeb) {
+      return; // Skip face detection on web, let demo mode handle alerts
     }
     
     try {
-      debugPrint('Running face detection on image...');
       final faces = await _faceDetector.processImage(inputImage);
       
-      debugPrint('Face detection: ${faces.length} faces detected');
-      
-      // Debug: Log face detection results occasionally
-      if (DateTime.now().millisecondsSinceEpoch % 1000 < 100) {
-        if (faces.isNotEmpty) {
-          final face = faces.first;
-          debugPrint('Face bounds: ${face.boundingBox}');
-          debugPrint('Left eye open: ${face.leftEyeOpenProbability}');
-          debugPrint('Right eye open: ${face.rightEyeOpenProbability}');
-          debugPrint('Head angles - X: ${face.headEulerAngleX}, Y: ${face.headEulerAngleY}');
-        } else {
+      // Reduce debug logging frequency for performance
+      if (DateTime.now().millisecondsSinceEpoch % 2000 < 100) {
+        debugPrint('Face detection: ${faces.length} faces detected');
+        if (faces.isEmpty) {
           debugPrint('⚠️  No faces detected - check camera position, lighting, or face detector settings');
         }
       }
       
-      // Process face detection results
-      
       if (faces.isEmpty) {
-        debugPrint('No faces detected in frame');
         consecutiveDrowsyFrames = 0;
         consecutiveDistractionFrames = 0;
         return;
@@ -185,11 +209,15 @@ class DetectionService extends ChangeNotifier {
         final rightEyeOpen = face.rightEyeOpenProbability ?? 1.0;
         final avgEyeOpen = (leftEyeOpen + rightEyeOpen) / 2.0;
         
-        debugPrint('Drowsiness check - Eye openness: ${avgEyeOpen.toStringAsFixed(2)}, Threshold: ${AppConstants.eyeClosureThreshold}');
+        // Reduce debug logging frequency for performance  
+        if (DateTime.now().millisecondsSinceEpoch % 2000 < 100) {
+          debugPrint('👁️ Drowsiness check - Left eye: ${leftEyeOpen.toStringAsFixed(2)}, Right eye: ${rightEyeOpen.toStringAsFixed(2)}, Average: ${avgEyeOpen.toStringAsFixed(2)}, Threshold: ${AppConstants.eyeClosureThreshold}');
+        }
         
+        // Check if eyes are closed (below threshold)
         if (avgEyeOpen < AppConstants.eyeClosureThreshold) {
           consecutiveDrowsyFrames++;
-          debugPrint('Drowsy frame: $consecutiveDrowsyFrames/${AppConstants.drowsinessFrameThreshold}');
+          debugPrint('😴 Eyes closed detected! Frame ${consecutiveDrowsyFrames}/${AppConstants.drowsinessFrameThreshold}');
           
           if (consecutiveDrowsyFrames >= AppConstants.drowsinessFrameThreshold) {
             final now = DateTime.now();
@@ -198,8 +226,8 @@ class DetectionService extends ChangeNotifier {
             if (lastDrowsinessAlert == null || 
                 now.difference(lastDrowsinessAlert!).inMilliseconds > AppConstants.drowsinessAlertCooldown) {
               
-              debugPrint('😴 DROWSINESS ALERT TRIGGERED! Consecutive frames: $consecutiveDrowsyFrames');
-              _showAlert("Drowsiness detected! Driver appears to be sleeping!");
+              debugPrint('� DROWSINESS ALERT TRIGGERED! Consecutive frames: $consecutiveDrowsyFrames');
+              _showAlert("WAKE UP! Driver appears to be falling asleep!");
               
               final detection = DetectionResult(
                 type: DetectionType.drowsiness,
@@ -217,6 +245,9 @@ class DetectionService extends ChangeNotifier {
             }
           }
         } else {
+          if (consecutiveDrowsyFrames > 0) {
+            debugPrint('👁️ Eyes opened - resetting drowsy frame count from $consecutiveDrowsyFrames to 0');
+          }
           consecutiveDrowsyFrames = 0;
         }
       }
@@ -229,12 +260,15 @@ class DetectionService extends ChangeNotifier {
         // Method 1: Head pose angle detection
         if (face.headEulerAngleY != null) {
           final yaw = face.headEulerAngleY!.abs();
-          debugPrint('🔄 Distraction check - Head yaw: ${yaw.toStringAsFixed(1)}°, Threshold: ${AppConstants.headPoseThreshold}°');
+          
+          // Reduce debug logging frequency for performance
+          if (DateTime.now().millisecondsSinceEpoch % 4000 < 100) {
+            debugPrint('🔄 Distraction check - Head yaw: ${yaw.toStringAsFixed(1)}°, Threshold: ${AppConstants.headPoseThreshold}°');
+          }
           
           if (yaw > AppConstants.headPoseThreshold) {
             isDistracted = true;
             distractionConfidence = (yaw / 45.0).clamp(0.0, 1.0); // Normalize to 0-1
-            debugPrint('🔄 HEAD ANGLE DISTRACTION DETECTED! Yaw: ${yaw.toStringAsFixed(1)}°');
           }
         }
         
@@ -261,18 +295,19 @@ class DetectionService extends ChangeNotifier {
           final movement = (firstCenter - lastCenter).distance;
           final movementThreshold = 50.0; // pixels
           
-          debugPrint('🔄 Face movement: ${movement.toStringAsFixed(1)}px, Threshold: ${movementThreshold}px');
+          // Reduce debug logging frequency for performance
+          if (DateTime.now().millisecondsSinceEpoch % 5000 < 100) {
+            debugPrint('🔄 Face movement: ${movement.toStringAsFixed(1)}px, Threshold: ${movementThreshold}px');
+          }
           
           if (movement > movementThreshold) {
             isDistracted = true;
             distractionConfidence = (movement / 100.0).clamp(0.0, 1.0); // Normalize to 0-1
-            debugPrint('🔄 FACE MOVEMENT DISTRACTION DETECTED! Movement: ${movement.toStringAsFixed(1)}px');
           }
         }
         
         if (isDistracted) {
           consecutiveDistractionFrames++;
-          debugPrint('🔄 Distraction frame: $consecutiveDistractionFrames/${AppConstants.distractionFrameThreshold}');
           
           if (consecutiveDistractionFrames >= AppConstants.distractionFrameThreshold) {
             final now = DateTime.now();
@@ -304,18 +339,23 @@ class DetectionService extends ChangeNotifier {
         }
       }
       
-      // Simple yawning detection based on mouth opening
+      // Enhanced yawning detection based on mouth opening
       if (isYawningDetectionEnabled) {
         // Use smilingProbability as a proxy for mouth openness (inverse relationship)
         final mouthOpen = face.smilingProbability != null ? (1.0 - face.smilingProbability!) : 0.0;
-        debugPrint('Yawning check - Mouth openness: ${mouthOpen.toStringAsFixed(2)}, Threshold: ${AppConstants.mouthAspectRatioThreshold}');
+        
+        // Reduce debug logging frequency for performance
+        if (DateTime.now().millisecondsSinceEpoch % 2000 < 100) {
+          debugPrint('🥱 Yawning check - Mouth openness: ${mouthOpen.toStringAsFixed(2)}, Smiling prob: ${face.smilingProbability?.toStringAsFixed(2) ?? "null"}, Threshold: ${AppConstants.mouthAspectRatioThreshold}');
+        }
         
         if (mouthOpen > AppConstants.mouthAspectRatioThreshold) {
           final now = DateTime.now();
           if (lastYawningAlert == null || 
               now.difference(lastYawningAlert!).inMilliseconds > AppConstants.yawningAlertCooldown) {
             
-            _showAlert("Yawning detected! Driver may be tired!");
+            debugPrint('🥱 YAWNING ALERT TRIGGERED! Mouth openness: ${mouthOpen.toStringAsFixed(2)}');
+            _showAlert("Yawning detected! Driver may be getting tired!");
             
             final detection = DetectionResult(
               type: DetectionType.yawning,
@@ -326,32 +366,43 @@ class DetectionService extends ChangeNotifier {
             _detectionHistory.addDetection(detection);
             _detectionStats.incrementDetection(DetectionType.yawning);
             lastYawningAlert = now;
+          } else {
+            final cooldownRemaining = AppConstants.yawningAlertCooldown - now.difference(lastYawningAlert!).inMilliseconds;
+            debugPrint('🥱 Yawning detected but in cooldown (${cooldownRemaining}ms remaining)');
           }
         }
       }
       
-      // Simple motion sickness detection based on excessive head movement
+      // Enhanced motion sickness detection based on excessive head movement
       if (isMotionSicknessDetectionEnabled) {
         if (face.headEulerAngleX != null && face.headEulerAngleY != null) {
           final totalHeadMovement = face.headEulerAngleX!.abs() + face.headEulerAngleY!.abs();
-          debugPrint('Motion sickness check - Total head movement: ${totalHeadMovement.toStringAsFixed(1)}°');
+          
+          // Reduce debug logging frequency for performance
+          if (DateTime.now().millisecondsSinceEpoch % 3000 < 100) {
+            debugPrint('🤢 Motion sickness check - X angle: ${face.headEulerAngleX!.toStringAsFixed(1)}°, Y angle: ${face.headEulerAngleY!.toStringAsFixed(1)}°, Total: ${totalHeadMovement.toStringAsFixed(1)}°, Threshold: ${AppConstants.motionSicknessThreshold * 10}°');
+          }
           
           if (totalHeadMovement > AppConstants.motionSicknessThreshold * 10) {
             final now = DateTime.now();
             if (lastMotionSicknessAlert == null || 
                 now.difference(lastMotionSicknessAlert!).inMilliseconds > AppConstants.motionSicknessAlertCooldown) {
               
+              debugPrint('🤢 MOTION SICKNESS ALERT TRIGGERED! Total movement: ${totalHeadMovement.toStringAsFixed(1)}°');
               _showAlert("Motion sickness detected! Driver appears unwell!");
               
               final detection = DetectionResult(
                 type: DetectionType.motionSickness,
-                confidence: totalHeadMovement / 90.0,
+                confidence: (totalHeadMovement / 60.0).clamp(0.0, 1.0),
                 timestamp: now,
               );
               
               _detectionHistory.addDetection(detection);
               _detectionStats.incrementDetection(DetectionType.motionSickness);
               lastMotionSicknessAlert = now;
+            } else {
+              final cooldownRemaining = AppConstants.motionSicknessAlertCooldown - now.difference(lastMotionSicknessAlert!).inMilliseconds;
+              debugPrint('🤢 Motion sickness detected but in cooldown (${cooldownRemaining}ms remaining)');
             }
           }
         }
@@ -439,29 +490,25 @@ class DetectionService extends ChangeNotifier {
   void _showAlert(String message) {
     debugPrint("🚨 ALERT TRIGGERED: $message");
     
-    // Prevent overlapping alerts
-    if (_isVoiceAlertInProgress) {
-      debugPrint("⏳ Voice alert in progress, queuing this alert");
-      return;
-    }
-    
+    // Set current alert immediately for UI display
     currentAlert = message;
     _alertDisplayStartTime = DateTime.now();
     
     // Show visual alert immediately
     _showVisualAlert(message);
     
-    // Add delay before vibration
+    // Notify listeners immediately to update UI
+    notifyListeners();
+    
+    // Add small delay before vibration
     Timer(Duration(milliseconds: AppConstants.vibrationDelay), () {
       _triggerVibration();
     });
     
-    // Add delay before voice alert
+    // Add small delay before voice alert to ensure vibration happens first
     Timer(Duration(milliseconds: AppConstants.voiceAlertDelay), () {
       _triggerVoiceAlert(message);
     });
-    
-    notifyListeners();
     
     // Clear alert after specified duration
     Timer(Duration(milliseconds: AppConstants.alertDisplayDuration), () {
@@ -469,6 +516,7 @@ class DetectionService extends ChangeNotifier {
         currentAlert = null;
         _alertDisplayStartTime = null;
         notifyListeners();
+        debugPrint("🔔 Alert cleared: $message");
       }
     });
   }
@@ -489,23 +537,70 @@ class DetectionService extends ChangeNotifier {
   Future<void> _triggerVoiceAlert(String message) async {
     debugPrint("🔊 Voice alert check - Enabled: $isVoiceAlertsEnabled, Speaking: $_isSpeaking, InProgress: $_isVoiceAlertInProgress");
     
-    if (!isVoiceAlertsEnabled || _isSpeaking || _isVoiceAlertInProgress) {
-      debugPrint("🔇 Voice alert skipped - Enabled: $isVoiceAlertsEnabled, Speaking: $_isSpeaking, InProgress: $_isVoiceAlertInProgress");
+    if (!isVoiceAlertsEnabled) {
+      debugPrint("🔇 Voice alerts disabled, skipping TTS");
+      return;
+    }
+    
+    if (_isSpeaking || _isVoiceAlertInProgress) {
+      debugPrint("🔇 Voice alert already in progress, skipping");
       return;
     }
     
     try {
       _isSpeaking = true;
       _isVoiceAlertInProgress = true;
-      debugPrint("🎤 Speaking voice alert: $message");
-      await _flutterTts.speak(message);
-      debugPrint("✅ Voice alert completed successfully");
+      debugPrint("🎤 Starting voice alert: $message");
+      
+      // Stop any existing speech first
+      await _flutterTts.stop();
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Speak the alert message
+      final result = await _flutterTts.speak(message);
+      debugPrint("🎤 TTS speak result: $result");
+      
+      // Set a timeout to ensure flags are reset even if completion handler fails
+      Timer(const Duration(seconds: 8), () {
+        if (_isSpeaking || _isVoiceAlertInProgress) {
+          debugPrint("🎤 TTS timeout - resetting flags");
+          _isSpeaking = false;
+          _isVoiceAlertInProgress = false;
+        }
+      });
+      
+      debugPrint("✅ Voice alert initiated successfully");
     } catch (e) {
       debugPrint("❌ Voice alert failed: $e");
-    } finally {
       _isSpeaking = false;
       _isVoiceAlertInProgress = false;
     }
+  }
+  
+  // Web demo mode to test voice alerts
+  void _startWebDemoMode() {
+    debugPrint("🌐 Starting web demo mode for voice alert testing");
+    _webDemoTimer?.cancel();
+    
+    _webDemoTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (!isRunning) {
+        timer.cancel();
+        return;
+      }
+      
+      _webDemoCounter++;
+      final messages = [
+        "Demo alert: Testing drowsiness detection!",
+        "Demo alert: Testing distraction warning!",
+        "Demo alert: Testing yawning detection!",
+        "Demo alert: Testing motion sickness alert!",
+        "Demo alert: All voice systems working correctly!",
+      ];
+      
+      final message = messages[_webDemoCounter % messages.length];
+      debugPrint("🌐 Demo alert #$_webDemoCounter: $message");
+      _showAlert(message);
+    });
   }
   
   void startDetection() {
@@ -545,6 +640,11 @@ class DetectionService extends ChangeNotifier {
     _hasTriggeredTestAlert = false;
     consecutiveDrowsyFrames = 0;
     consecutiveDistractionFrames = 0;
+    
+    // Clean up web demo timer
+    _webDemoTimer?.cancel();
+    _webDemoTimer = null;
+    _webDemoCounter = 0;
     
     // Reset face position tracking
     _facePositionHistory.clear();

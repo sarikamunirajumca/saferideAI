@@ -6,33 +6,33 @@ class AppConstants {
   // App-wide settings
   static const String appName = 'SafeRide AI';
   
-  // Monitoring thresholds (simplified for testing)
-  static const double eyeClosureThreshold = 0.5; // Very lenient for testing
-  static const double headPoseThreshold = 5.0; // Much more sensitive for testing
-  static const int drowsinessFrameThreshold = 5; // Require 5 consecutive frames for stability
-  static const int distractionFrameThreshold = 5; // Require 5 consecutive frames for stability
+  // Monitoring thresholds (highly sensitive for real device testing)
+  static const double eyeClosureThreshold = 0.6; // Very sensitive - eyes considered closed at 60% probability
+  static const double headPoseThreshold = 15.0; // Very sensitive head pose threshold (15 degrees)
+  static const int drowsinessFrameThreshold = 2; // Require only 2 consecutive frames for fastest response
+  static const int distractionFrameThreshold = 2; // Require only 2 consecutive frames for fastest response
   
-  // Advanced detection thresholds from car_ai
-  static const double mouthAspectRatioThreshold = 0.5; // Very sensitive for testing
-  static const double sleepRatioThreshold = 0.3; // Very sensitive for testing
-  static const int sleepWindowFrames = 10; // Very fast for testing
-  static const int headHistoryLength = 10; // Reduced for testing
-  static const double motionSicknessThreshold = 3.0; // Very sensitive for testing
+  // Advanced detection thresholds from car_ai (optimized for physical device)
+  static const double mouthAspectRatioThreshold = 0.5; // Very sensitive for yawning detection
+  static const double sleepRatioThreshold = 0.3; // Very sensitive for sleep detection
+  static const int sleepWindowFrames = 3; // Fastest response for sleep detection
+  static const int headHistoryLength = 5; // Faster tracking
+  static const double motionSicknessThreshold = 1.5; // Very sensitive for motion sickness
   
-  // Alert cooldowns (in milliseconds) - Enhanced timing control
-  static const int drowsinessAlertCooldown = 30000; // 30 seconds between drowsiness alerts
-  static const int distractionAlertCooldown = 30000; // 30 seconds between distraction alerts
-  static const int yawningAlertCooldown = 30000; // 30 seconds between yawning alerts
-  static const int motionSicknessAlertCooldown = 30000; // 30 seconds between motion sickness alerts
-  static const int seatbeltAlertCooldown = 30000; // 30 seconds between seatbelt alerts
-  static const int phoneUsageAlertCooldown = 30000; // 30 seconds between phone usage alerts
-  static const int erraticMovementAlertCooldown = 30000; // 30 seconds between erratic movement alerts
+  // Alert cooldowns (in milliseconds) - Very reduced for immediate testing
+  static const int drowsinessAlertCooldown = 5000; // 5 seconds between drowsiness alerts
+  static const int distractionAlertCooldown = 4000; // 4 seconds between distraction alerts
+  static const int yawningAlertCooldown = 8000; // 8 seconds between yawning alerts
+  static const int motionSicknessAlertCooldown = 6000; // 6 seconds between motion sickness alerts
+  static const int seatbeltAlertCooldown = 10000; // 10 seconds between seatbelt alerts
+  static const int phoneUsageAlertCooldown = 5000; // 5 seconds between phone usage alerts
+  static const int erraticMovementAlertCooldown = 4000; // 4 seconds between erratic movement alerts
   
-  // Processing delays (in milliseconds)
-  static const int imageProcessingDelay = 200; // 200ms delay between image processing
-  static const int alertDisplayDuration = 3000; // 3 seconds to display visual alerts
-  static const int voiceAlertDelay = 500; // 500ms delay before voice alert
-  static const int vibrationDelay = 100; // 100ms delay before vibration
+  // Processing delays (in milliseconds) - Optimized for better alert responsiveness
+  static const int imageProcessingDelay = 200; // 200ms delay for better responsiveness
+  static const int alertDisplayDuration = 5000; // 5 seconds to display visual alerts
+  static const int voiceAlertDelay = 200; // 200ms delay before voice alert
+  static const int vibrationDelay = 50; // 50ms delay before vibration
   static const int startupDelay = 0; // No delay - start monitoring immediately
   
   // Consecutive frame requirements for stability

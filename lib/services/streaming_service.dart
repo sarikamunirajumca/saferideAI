@@ -24,6 +24,11 @@ class StreamingService {
   Uint8List? _currentFrame;
   DateTime? _lastFrameTime;
   
+  // Frame rate limiting - optimized for smoother streaming
+  static const int targetFps = 30; // Increased to 30 FPS for better responsiveness
+  static const int frameIntervalMs = 1000 ~/ targetFps; // ~33ms between frames
+  DateTime? _lastFrameProcessed;
+  
   bool get isStreaming => _isStreaming;
   String? get serverUrl => _serverUrl;
 
@@ -104,12 +109,25 @@ class StreamingService {
   void addFrame(CameraImage image) {
     if (!_isStreaming || _frameController == null) return;
 
+    // Optimized frame rate limiting - more aggressive for better responsiveness
+    final now = DateTime.now();
+    if (_lastFrameProcessed != null && 
+        now.difference(_lastFrameProcessed!).inMilliseconds < (frameIntervalMs ~/ 2)) {
+      return; // Skip this frame, but with reduced interval for better performance
+    }
+    _lastFrameProcessed = now;
+
     try {
-      // Convert camera image to JPEG bytes
+      // Minimal logging for performance
+      if (DateTime.now().millisecondsSinceEpoch % 15000 < 100) { // Every 15 seconds
+        debugPrint('📹 Processing frame - Format: ${image.format.group}, Size: ${image.width}x${image.height}');
+      }
+      
+      // Convert camera image to JPEG with optimized conversion
       final jpegBytes = _convertCameraImageToJpeg(image);
       if (jpegBytes != null) {
         _currentFrame = jpegBytes;
-        _lastFrameTime = DateTime.now();
+        _lastFrameTime = now;
         
         // Add to stream if there are listeners
         if (_frameController!.hasListener) {
@@ -123,13 +141,13 @@ class StreamingService {
 
   Uint8List? _convertCameraImageToJpeg(CameraImage image) {
     try {
-      // Convert camera image to RGB format, then encode as JPEG
-      if (image.format.group == ImageFormatGroup.yuv420) {
+      // Prioritize BGRA8888 for best performance and color quality
+      if (image.format.group == ImageFormatGroup.bgra8888) {
+        return _convertBGRA8888ToJpeg(image);
+      } else if (image.format.group == ImageFormatGroup.yuv420) {
         return _convertYUV420ToJpeg(image);
       } else if (image.format.group == ImageFormatGroup.nv21) {
         return _convertNV21ToJpeg(image);
-      } else if (image.format.group == ImageFormatGroup.bgra8888) {
-        return _convertBGRA8888ToJpeg(image);
       }
       
       // Fallback: try to create a basic frame from the first plane
@@ -145,20 +163,24 @@ class StreamingService {
       final int width = image.width;
       final int height = image.height;
       
+      // Reduce resolution for faster streaming (quarter size)
+      final int streamWidth = width ~/ 2;
+      final int streamHeight = height ~/ 2;
+      
       // Get Y, U, V planes
       final yPlane = image.planes[0];
       final uPlane = image.planes[1];
       final vPlane = image.planes[2];
       
-      // Create RGB data from YUV420
-      final rgbData = _yuv420ToRgb(
+      // Create RGB data from YUV420 with reduced resolution
+      final rgbData = _yuv420ToRgbOptimized(
         yPlane.bytes, uPlane.bytes, vPlane.bytes,
-        width, height,
+        width, height, streamWidth, streamHeight,
         yPlane.bytesPerRow, uPlane.bytesPerRow, vPlane.bytesPerRow
       );
       
       // Create a simple JPEG-like structure
-      return _createJpegFromRgb(rgbData, width, height);
+      return _createJpegFromRgb(rgbData, streamWidth, streamHeight);
     } catch (e) {
       debugPrint('❌ Error in YUV420 conversion: $e');
       return _createBasicJpegFrame(image);
@@ -210,6 +232,58 @@ class StreamingService {
     }
   }
 
+  // Optimized YUV420 to RGB conversion with reduced resolution for faster streaming
+  Uint8List _yuv420ToRgbOptimized(
+      Uint8List yPlane, Uint8List uPlane, Uint8List vPlane,
+      int originalWidth, int originalHeight, int targetWidth, int targetHeight,
+      int yRowStride, int uRowStride, int vRowStride) {
+    
+    final rgbData = Uint8List(targetWidth * targetHeight * 3);
+    
+    // Sample every 2nd pixel for reduced resolution and faster processing
+    final xStep = originalWidth ~/ targetWidth;
+    final yStep = originalHeight ~/ targetHeight;
+    
+    for (int ty = 0; ty < targetHeight; ty++) {
+      for (int tx = 0; tx < targetWidth; tx++) {
+        final x = tx * xStep;
+        final y = ty * yStep;
+        
+        final yIndex = y * yRowStride + x;
+        
+        // For YUV420, UV planes are subsampled by 2 in both dimensions
+        final uvY = y ~/ 2;
+        final uvX = x ~/ 2;
+        final uIndex = uvY * uRowStride + uvX;
+        final vIndex = uvY * vRowStride + uvX;
+        
+        if (yIndex < yPlane.length && uIndex < uPlane.length && vIndex < vPlane.length) {
+          final yValue = yPlane[yIndex].toDouble();
+          final uValue = uPlane[uIndex].toDouble();
+          final vValue = vPlane[vIndex].toDouble();
+          
+          // Fast YUV to RGB conversion
+          final y_scaled = (yValue - 16.0) * 1.164;
+          final u_scaled = uValue - 128.0;
+          final v_scaled = vValue - 128.0;
+          
+          final r = (y_scaled + 1.596 * v_scaled).round().clamp(0, 255);
+          final g = (y_scaled - 0.391 * u_scaled - 0.813 * v_scaled).round().clamp(0, 255);
+          final b = (y_scaled + 2.018 * u_scaled).round().clamp(0, 255);
+          
+          final rgbIndex = (ty * targetWidth + tx) * 3;
+          if (rgbIndex + 2 < rgbData.length) {
+            rgbData[rgbIndex] = r;
+            rgbData[rgbIndex + 1] = g;
+            rgbData[rgbIndex + 2] = b;
+          }
+        }
+      }
+    }
+    
+    return rgbData;
+  }
+
   Uint8List _yuv420ToRgb(
       Uint8List yPlane, Uint8List uPlane, Uint8List vPlane,
       int width, int height,
@@ -217,27 +291,50 @@ class StreamingService {
     
     final rgbData = Uint8List(width * height * 3);
     
+    // Reduced logging frequency to improve performance (every 10 seconds)
+    if (DateTime.now().millisecondsSinceEpoch % 10000 < 100) {
+      debugPrint('🎨 YUV420 to RGB conversion - Size: ${width}x${height}');
+    }
+    
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         final yIndex = y * yRowStride + x;
-        final uvIndex = (y ~/ 2) * uRowStride + (x ~/ 2);
         
-        if (yIndex < yPlane.length && uvIndex < uPlane.length && uvIndex < vPlane.length) {
-          final yValue = yPlane[yIndex];
-          final uValue = uPlane[uvIndex];
-          final vValue = vPlane[uvIndex];
+        // For YUV420, UV planes are subsampled by 2 in both dimensions
+        final uvY = y ~/ 2;
+        final uvX = x ~/ 2;
+        final uIndex = uvY * uRowStride + uvX;
+        final vIndex = uvY * vRowStride + uvX;
+        
+        if (yIndex < yPlane.length && uIndex < uPlane.length && vIndex < vPlane.length) {
+          final yValue = yPlane[yIndex].toDouble();
+          final uValue = uPlane[uIndex].toDouble();
+          final vValue = vPlane[vIndex].toDouble();
           
-          // YUV to RGB conversion
-          final r = (yValue + 1.402 * (vValue - 128)).clamp(0, 255).toInt();
-          final g = (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128)).clamp(0, 255).toInt();
-          final b = (yValue + 1.772 * (uValue - 128)).clamp(0, 255).toInt();
+          // Enhanced ITU-R BT.601 conversion with proper scaling
+          // Convert to full range RGB (0-255)
+          final y_scaled = (yValue - 16.0) * 1.164;
+          final u_scaled = uValue - 128.0;
+          final v_scaled = vValue - 128.0;
+          
+          // More precise conversion coefficients for better color reproduction
+          final r = (y_scaled + 1.596 * v_scaled).round().clamp(0, 255);
+          final g = (y_scaled - 0.391 * u_scaled - 0.813 * v_scaled).round().clamp(0, 255);
+          final b = (y_scaled + 2.018 * u_scaled).round().clamp(0, 255);
           
           final rgbIndex = (y * width + x) * 3;
-          rgbData[rgbIndex] = r;
-          rgbData[rgbIndex + 1] = g;
-          rgbData[rgbIndex + 2] = b;
+          if (rgbIndex + 2 < rgbData.length) {
+            rgbData[rgbIndex] = r;
+            rgbData[rgbIndex + 1] = g;
+            rgbData[rgbIndex + 2] = b;
+          }
         }
       }
+    }
+    
+    // Log some sample RGB values for debugging (reduced frequency)
+    if (DateTime.now().millisecondsSinceEpoch % 10000 < 100 && rgbData.length >= 9) { // Every 10 seconds
+      debugPrint('🎨 Sample RGB values: R1=${rgbData[0]}, G1=${rgbData[1]}, B1=${rgbData[2]}');
     }
     
     return rgbData;
@@ -253,27 +350,33 @@ class StreamingService {
         if (yIndex < yPlane.length) {
           final yValue = yPlane[yIndex];
           
-          // For grayscale fallback if UV plane is not available
+          // Get U and V values with proper NV21 format handling
           int uValue = 128;
           int vValue = 128;
           
-          if (uvPlane != null) {
+          if (uvPlane != null && uvPlane.isNotEmpty) {
             final uvIndex = (y ~/ 2) * width + (x & ~1);
             if (uvIndex + 1 < uvPlane.length) {
-              vValue = uvPlane[uvIndex];
-              uValue = uvPlane[uvIndex + 1];
+              vValue = uvPlane[uvIndex];     // V comes first in NV21
+              uValue = uvPlane[uvIndex + 1]; // U comes second
             }
           }
           
-          // YUV to RGB conversion
-          final r = (yValue + 1.402 * (vValue - 128)).clamp(0, 255).toInt();
-          final g = (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128)).clamp(0, 255).toInt();
-          final b = (yValue + 1.772 * (uValue - 128)).clamp(0, 255).toInt();
+          // Optimized YUV to RGB conversion for better color accuracy
+          final c = yValue - 16;
+          final d = uValue - 128;
+          final e = vValue - 128;
+          
+          final r = ((298 * c + 409 * e + 128) >> 8).clamp(0, 255);
+          final g = ((298 * c - 100 * d - 208 * e + 128) >> 8).clamp(0, 255);
+          final b = ((298 * c + 516 * d + 128) >> 8).clamp(0, 255);
           
           final rgbIndex = y * width * 3 + x * 3;
-          rgbData[rgbIndex] = r;
-          rgbData[rgbIndex + 1] = g;
-          rgbData[rgbIndex + 2] = b;
+          if (rgbIndex + 2 < rgbData.length) {
+            rgbData[rgbIndex] = r;
+            rgbData[rgbIndex + 1] = g;
+            rgbData[rgbIndex + 2] = b;
+          }
         }
       }
     }
@@ -282,110 +385,65 @@ class StreamingService {
   }
 
   Uint8List _createJpegFromRgb(Uint8List rgbData, int width, int height) {
-    // Create a simple bitmap header + RGB data
-    // This creates a basic image format that browsers can display
-    
-    final header = _createBitmapHeader(width, height);
-    final imageData = Uint8List(header.length + rgbData.length);
-    
-    imageData.setRange(0, header.length, header);
-    imageData.setRange(header.length, imageData.length, rgbData);
-    
-    return imageData;
+    // Create a simple uncompressed image format that's more compact than PPM
+    // Use a basic BMP format which is smaller and widely supported
+    return _createBmpFromRgb(rgbData, width, height);
   }
 
-  Uint8List _createBitmapHeader(int width, int height) {
-    // Create a simple BMP header
-    final fileSize = 54 + (width * height * 3);
-    final header = Uint8List(54);
+  Uint8List _createBmpFromRgb(Uint8List rgbData, int width, int height) {
+    // Create a simple 24-bit BMP image
+    final int imageSize = width * height * 3;
+    final int fileSize = 54 + imageSize; // BMP header is 54 bytes
     
-    // BMP signature
-    header[0] = 0x42; // 'B'
-    header[1] = 0x4D; // 'M'
+    final bmpData = Uint8List(fileSize);
     
-    // File size
-    header[2] = fileSize & 0xFF;
-    header[3] = (fileSize >> 8) & 0xFF;
-    header[4] = (fileSize >> 16) & 0xFF;
-    header[5] = (fileSize >> 24) & 0xFF;
+    // BMP File Header (14 bytes)
+    bmpData[0] = 0x42; // 'B'
+    bmpData[1] = 0x4D; // 'M'
+    _writeInt32(bmpData, 2, fileSize); // File size
+    _writeInt32(bmpData, 6, 0); // Reserved
+    _writeInt32(bmpData, 10, 54); // Offset to image data
     
-    // Reserved
-    header[6] = 0;
-    header[7] = 0;
-    header[8] = 0;
-    header[9] = 0;
+    // BMP Info Header (40 bytes)
+    _writeInt32(bmpData, 14, 40); // Header size
+    _writeInt32(bmpData, 18, width); // Image width
+    _writeInt32(bmpData, 22, height); // Image height
+    _writeInt16(bmpData, 26, 1); // Color planes
+    _writeInt16(bmpData, 28, 24); // Bits per pixel
+    _writeInt32(bmpData, 30, 0); // Compression (none)
+    _writeInt32(bmpData, 34, imageSize); // Image size
+    _writeInt32(bmpData, 38, 0); // X pixels per meter
+    _writeInt32(bmpData, 42, 0); // Y pixels per meter
+    _writeInt32(bmpData, 46, 0); // Colors used
+    _writeInt32(bmpData, 50, 0); // Important colors
     
-    // Data offset
-    header[10] = 54;
-    header[11] = 0;
-    header[12] = 0;
-    header[13] = 0;
+    // Convert RGB to BGR (BMP uses BGR format) and flip vertically
+    int dataIndex = 54;
+    for (int y = height - 1; y >= 0; y--) {
+      for (int x = 0; x < width; x++) {
+        final rgbIndex = (y * width + x) * 3;
+        if (rgbIndex + 2 < rgbData.length && dataIndex + 2 < bmpData.length) {
+          bmpData[dataIndex] = rgbData[rgbIndex + 2];     // B
+          bmpData[dataIndex + 1] = rgbData[rgbIndex + 1]; // G
+          bmpData[dataIndex + 2] = rgbData[rgbIndex];     // R
+          dataIndex += 3;
+        }
+      }
+    }
     
-    // Header size
-    header[14] = 40;
-    header[15] = 0;
-    header[16] = 0;
-    header[17] = 0;
-    
-    // Width
-    header[18] = width & 0xFF;
-    header[19] = (width >> 8) & 0xFF;
-    header[20] = (width >> 16) & 0xFF;
-    header[21] = (width >> 24) & 0xFF;
-    
-    // Height (negative for top-down)
-    final negHeight = -height;
-    header[22] = negHeight & 0xFF;
-    header[23] = (negHeight >> 8) & 0xFF;
-    header[24] = (negHeight >> 16) & 0xFF;
-    header[25] = (negHeight >> 24) & 0xFF;
-    
-    // Planes
-    header[26] = 1;
-    header[27] = 0;
-    
-    // Bits per pixel
-    header[28] = 24;
-    header[29] = 0;
-    
-    // Compression (0 = none)
-    header[30] = 0;
-    header[31] = 0;
-    header[32] = 0;
-    header[33] = 0;
-    
-    // Image size
-    final imageSize = width * height * 3;
-    header[34] = imageSize & 0xFF;
-    header[35] = (imageSize >> 8) & 0xFF;
-    header[36] = (imageSize >> 16) & 0xFF;
-    header[37] = (imageSize >> 24) & 0xFF;
-    
-    // X pixels per meter
-    header[38] = 0;
-    header[39] = 0;
-    header[40] = 0;
-    header[41] = 0;
-    
-    // Y pixels per meter
-    header[42] = 0;
-    header[43] = 0;
-    header[44] = 0;
-    header[45] = 0;
-    
-    // Colors used
-    header[46] = 0;
-    header[47] = 0;
-    header[48] = 0;
-    header[49] = 0;
-    
-    // Colors important
-    header[50] = 0;
-    header[51] = 0;
-    header[52] = 0;
-    header[53] = 0;
-    
-    return header;
+    return bmpData;
+  }
+
+  void _writeInt32(Uint8List data, int offset, int value) {
+    data[offset] = value & 0xFF;
+    data[offset + 1] = (value >> 8) & 0xFF;
+    data[offset + 2] = (value >> 16) & 0xFF;
+    data[offset + 3] = (value >> 24) & 0xFF;
+  }
+
+  void _writeInt16(Uint8List data, int offset, int value) {
+    data[offset] = value & 0xFF;
+    data[offset + 1] = (value >> 8) & 0xFF;
   }
 
   Uint8List _createBasicJpegFrame(CameraImage image) {
@@ -495,14 +553,18 @@ class StreamingService {
             overflow: hidden;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             border: 2px solid rgba(59, 130, 246, 0.3);
+            width: 95vw;
+            height: 75vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .video-stream {
-            display: block;
-            max-width: 90vw;
-            max-height: 70vh;
-            width: auto;
-            height: auto;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror horizontally for front camera */
         }
         
         .video-overlay {

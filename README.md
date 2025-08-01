@@ -225,15 +225,222 @@ final movementStd = calculateStandardDeviation(headPoseHistory);
 
 SafeRide AI App represents the next generation of vehicle safety technology, bringing advanced laboratory-grade detection algorithms into practical, everyday use for enhanced road safety and driver awareness.
 
-## Getting Started
+## 🔧 **Development Setup**
 
-This project is a starting point for a Flutter application.
+### **Prerequisites**
+- Flutter SDK 3.0.0 or higher
+- Dart SDK 3.0.0 or higher
+- Android Studio / VS Code with Flutter extensions
+- Physical device (camera access required for testing)
 
-A few resources to get you started if this is your first Flutter project:
+### **Installation Steps**
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/sarikamunirajumca/saferide-ai-app.git
+   cd saferide_ai_app
+   ```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+3. **Run the application**
+   ```bash
+   flutter run
+   ```
+
+### **Key Dependencies**
+- **camera**: ^0.10.0 - Camera access and controls
+- **google_mlkit_face_detection**: ^0.13.1 - AI-powered face detection
+- **provider**: ^6.0.0 - State management
+- **wakelock_plus**: ^1.1.1 - Keep screen active during monitoring
+- **flutter_tts**: ^4.0.2 - Text-to-speech for voice alerts
+- **flutter_local_notifications**: ^19.4.0 - System notifications
+- **vibration**: ^3.1.3 - Haptic feedback
+
+## 📱 **App Architecture**
+
+### **Core Services**
+- **CameraService**: Manages camera lifecycle and frame capture
+- **DetectionService**: Implements AI detection algorithms from car_ai
+- **NotificationService**: Handles alerts and notifications
+- **StreamingService**: Real-time video streaming capabilities
+- **WebDetectionService**: Optional web interface for monitoring
+
+### **Screen Structure**
+- **SplashScreen**: App initialization and permissions
+- **MonitoringScreen**: Main detection interface with real-time analysis
+- **SettingsScreen**: Configuration and sensitivity adjustments
+- **InstallationGuideScreen**: Step-by-step vehicle setup instructions
+
+### **Real-Time Detection Pipeline**
+```
+Camera Frame → Face Detection → Landmark Analysis → 
+Feature Extraction → Algorithm Processing → Alert Decision → 
+UI Update + Voice Alert + Notification
+```
+
+## 📊 **Detection Algorithms Implementation**
+
+### **From car_ai Python Integration**
+The Flutter app implements the same sophisticated algorithms from the car_ai Python system:
+
+#### **Drowsiness Detection**
+```dart
+// Eye Aspect Ratio (EAR) calculation
+double calculateEAR(List<FaceLandmark> landmarks) {
+  final leftEye = getEyeLandmarks(landmarks, isLeft: true);
+  final rightEye = getEyeLandmarks(landmarks, isLeft: false);
+  return (calculateEyeAspectRatio(leftEye) + calculateEyeAspectRatio(rightEye)) / 2.0;
+}
+
+// Windowed sleep detection (2.5 second window)
+bool detectDrowsiness(List<double> earHistory) {
+  final threshold = 0.23; // Same as car_ai
+  final sleepRatio = earHistory.where((ear) => ear < threshold).length / earHistory.length;
+  return sleepRatio > 0.8;
+}
+```
+
+#### **Head Pose Analysis**
+```dart
+// 3D head pose estimation for distraction detection
+class HeadPose {
+  final double pitch;
+  final double yaw;
+  final double roll;
+  
+  bool get isDistracted => yaw.abs() > 45 || pitch.abs() > 45;
+}
+```
+
+#### **Motion Sickness Detection**
+```dart
+// Statistical analysis of head movement patterns
+bool detectMotionSickness(List<HeadPose> poseHistory) {
+  final movements = calculateMovementStandardDeviation(poseHistory);
+  return movements.any((std) => std > 8.0);
+}
+```
+
+## 🔄 **Real-Time Streaming Features**
+
+### **MJPEG Streaming Server**
+- Built-in HTTP server for remote monitoring
+- Real-time video stream with detection overlays
+- Web interface accessible via local network
+- Configurable streaming quality and frame rate
+
+### **Network Integration**
+```dart
+// Start streaming server
+final streamingService = StreamingService();
+await streamingService.startServer(port: 8080);
+
+// Access via: http://[device-ip]:8080/stream
+```
+
+## ⚙️ **Configuration Management**
+
+### **Persistent Settings**
+- Detection sensitivity thresholds
+- Alert cooldown periods
+- Audio/visual/haptic preferences
+- Historical data retention settings
+- Streaming configuration
+
+### **Adaptive Algorithms**
+- Automatic threshold adjustment based on lighting
+- User behavior learning for reduced false positives
+- Environmental adaptation for different vehicles
+- Calibration wizard for optimal setup
+
+## 🚨 **Advanced Alert System**
+
+### **Multi-Level Priority System**
+1. **CRITICAL** - Sleep/Unconsciousness (Immediate alert)
+2. **HIGH** - Severe distraction (30s cooldown)
+3. **MEDIUM** - Phone usage, yawning (60s cooldown)
+4. **LOW** - Motion patterns, minor distractions (120s cooldown)
+
+### **Smart Alert Management**
+- Context-aware alert timing
+- Escalating alert intensity
+- Emergency override capabilities
+- Silent mode for passenger monitoring
+
+## 📈 **Performance Optimization**
+
+### **Battery & Thermal Management**
+- Adaptive frame rate (5-30 FPS based on conditions)
+- GPU acceleration for ML processing
+- Background processing optimization
+- Intelligent resource allocation
+
+### **Memory Management**
+- Circular buffers for historical data
+- Efficient face landmark caching
+- Automatic garbage collection
+- Memory leak prevention
+
+## 🛡️ **Security & Privacy**
+
+### **Data Protection**
+- 100% on-device processing
+- No cloud data transmission
+- Encrypted local storage
+- User-controlled data retention
+
+### **Permissions Management**
+- Camera access (required)
+- Notification permissions (required)
+- Storage access (optional)
+- Location services (disabled by default)
+
+## 🔮 **Roadmap & Future Enhancements**
+
+### **Version 2.0 Planned Features**
+- **Advanced Object Detection**: Enhanced phone/smoking detection
+- **Biometric Integration**: Heart rate monitoring via camera
+- **Fleet Management**: Multi-device coordination
+- **Cloud Analytics**: Optional aggregate safety insights
+
+### **Integration Possibilities**
+- **Android Auto/Apple CarPlay**: Native vehicle integration
+- **OBD-II Port**: Vehicle diagnostic data correlation
+- **Smartwatch Companion**: Additional biometric monitoring
+- **Emergency Services**: Automatic incident reporting
+
+## 📞 **Support & Contributing**
+
+### **Bug Reports & Feature Requests**
+- GitHub Issues: [Report bugs or request features](https://github.com/sarikamunirajumca/saferide-ai-app/issues)
+- Email Support: sarikamunirajumca@example.com
+
+### **Contributing Guidelines**
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### **Development Resources**
+- [Flutter Documentation](https://docs.flutter.dev/)
+- [Google ML Kit Documentation](https://developers.google.com/ml-kit)
+- [Car AI Python System](https://github.com/sarikamunirajumca/car-ai) - Backend algorithms
+
+## 📄 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 **Acknowledgments**
+
+- **Flutter Team** - Excellent cross-platform framework
+- **Google ML Kit** - On-device machine learning capabilities
+- **Car AI Python Project** - Core detection algorithms and research
+- **Open Source Community** - Various libraries and contributions
+
+---
+
+**⚠️ Safety Disclaimer**: SafeRide AI App is designed to assist with safety monitoring but should not be considered a replacement for attentive and responsible driving. Always follow traffic laws, maintain focus while driving, and use this technology as a supplementary safety tool only. The developers are not responsible for any accidents or incidents that may occur while using this application.

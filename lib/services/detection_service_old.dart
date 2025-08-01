@@ -127,102 +127,23 @@ class DetectionService extends ChangeNotifier {
     if (!isRunning) return;
     
     try {
-      final faces = await _faceDetector.processImage(inputImage);
+      // ML Kit face detection is disabled for YUV420 compatibility
+      // This improves performance significantly while we focus on video streaming
       
-      // Debug: Log face detection results (only occasionally to avoid spam)
-      if (DateTime.now().millisecondsSinceEpoch % 1000 < 100) { // Log roughly every second
-        debugPrint('Face detection: ${faces.length} faces detected');
-        if (faces.isNotEmpty) {
-          final face = faces.first;
-          debugPrint('Face bounds: ${face.boundingBox}');
-          debugPrint('Left eye open: ${face.leftEyeOpenProbability}');
-          debugPrint('Right eye open: ${face.rightEyeOpenProbability}');
-        }
+      // Minimal logging to avoid spam (only log once every 5 seconds)
+      if (DateTime.now().millisecondsSinceEpoch % 5000 < 100) {
+        debugPrint('⏰ Processing image... Running: $isRunning');
       }
       
-      // Test alert every 10 seconds to verify voice system
-      final now = DateTime.now();
-      if (lastDrowsinessAlert == null || 
-          now.difference(lastDrowsinessAlert!).inSeconds > 10) {
-        _showAlert("Test alert: System is working!");
-        lastDrowsinessAlert = now;
-        return;
-      }
-      
-      if (faces.isEmpty) {
-        // Reset drowsiness counter if no face is detected
-        consecutiveDrowsyFrames = 0;
-        consecutiveDistractionFrames = 0;
-        return;
-      }
-      
-      // For simplicity, we'll focus on the first detected face (driver)
-      final face = faces.first;
-      
-      // Simple detection for testing
-      bool alertTriggered = false;
-      
-      // Simple drowsiness detection
-      if (isDrowsinessDetectionEnabled && !alertTriggered) {
-        final leftEyeOpen = face.leftEyeOpenProbability ?? 1.0;
-        final rightEyeOpen = face.rightEyeOpenProbability ?? 1.0;
-        final avgEyeOpen = (leftEyeOpen + rightEyeOpen) / 2.0;
-        
-        debugPrint('Simple drowsiness check - Eye openness: ${avgEyeOpen.toStringAsFixed(2)}');
-        
-        if (avgEyeOpen < AppConstants.eyeClosureThreshold) {
-          consecutiveDrowsyFrames++;
-          debugPrint('Drowsy frame: $consecutiveDrowsyFrames/${AppConstants.drowsinessFrameThreshold}');
-          
-          if (consecutiveDrowsyFrames >= AppConstants.drowsinessFrameThreshold) {
-            final now = DateTime.now();
-            if (lastDrowsinessAlert == null || 
-                now.difference(lastDrowsinessAlert!).inMilliseconds > AppConstants.drowsinessAlertCooldown) {
-              
-              _showAlert("Drowsiness detected! Driver appears to be sleeping!");
-              lastDrowsinessAlert = now;
-              consecutiveDrowsyFrames = 0;
-              alertTriggered = true;
-            }
-          }
-        } else {
-          consecutiveDrowsyFrames = 0;
-        }
-      }
-      
-      // Simple distraction detection
-      if (isDistractionDetectionEnabled && !alertTriggered) {
-        if (face.headEulerAngleY != null) {
-          final yaw = face.headEulerAngleY!.abs();
-          debugPrint('Simple distraction check - Head yaw: ${yaw.toStringAsFixed(1)}°');
-          
-          if (yaw > AppConstants.headPoseThreshold) {
-            consecutiveDistractionFrames++;
-            debugPrint('Distraction frame: $consecutiveDistractionFrames/${AppConstants.distractionFrameThreshold}');
-            
-            if (consecutiveDistractionFrames >= AppConstants.distractionFrameThreshold) {
-              final now = DateTime.now();
-              if (lastDistractionAlert == null || 
-                  now.difference(lastDistractionAlert!).inMilliseconds > AppConstants.distractionAlertCooldown) {
-                
-                _showAlert("Driver distracted! Please focus on the road!");
-                lastDistractionAlert = now;
-                consecutiveDistractionFrames = 0;
-                alertTriggered = true;
-              }
-            }
-          } else {
-            consecutiveDistractionFrames = 0;
-          }
-        }
-      }
+      // No face detection processing to improve performance
+      // Face detection will be re-enabled once we implement proper YUV420→BGRA8888 conversion
       
     } catch (e) {
       debugPrint('Error processing image: $e');
     }
   }
   
-  void _showAlert(String message) {  // Advanced Distraction Detection (from car_ai)
+  // Advanced Distraction Detection (from car_ai)
   Future<bool> _detectAdvancedDistraction(Face face) async {
     if (face.headEulerAngleX != null && 
         face.headEulerAngleY != null && 
