@@ -1,0 +1,461 @@
+import 'dart:io';
+
+Future<void> generateSafeRideAIPDF() async {
+  print('🚀 Starting PDF generation for SafeRide AI Executive Summary...');
+
+  // Create a simple HTML content that can be converted to PDF
+  final htmlContent = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SafeRide AI - Executive Summary</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 40px;
+            max-width: 800px;
+        }
+        .header { 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 32px; 
+            font-weight: bold;
+        }
+        .header p { 
+            margin: 10px 0 0 0; 
+            font-size: 16px; 
+            opacity: 0.9;
+        }
+        .section { 
+            margin-bottom: 25px; 
+            border-left: 4px solid #2a5298; 
+            padding-left: 20px;
+        }
+        .section h2 { 
+            color: #1e3c72; 
+            font-size: 20px; 
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        .section h3 { 
+            color: #2a5298; 
+            font-size: 16px; 
+            margin: 15px 0 10px 0;
+        }
+        .highlight-box { 
+            background: #f8f9fa; 
+            border: 1px solid #e9ecef; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 15px 0;
+        }
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .tech-item {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tech-item h4 {
+            color: #1e3c72;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        ul { 
+            padding-left: 20px; 
+        }
+        li { 
+            margin-bottom: 8px; 
+        }
+        .conclusion { 
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            text-align: center; 
+            margin-top: 30px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 12px;
+        }
+        @media print {
+            body { margin: 20px; }
+            .header, .conclusion { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚗 SafeRide AI</h1>
+        <p>Advanced In-Car Safety Monitoring System</p>
+    </div>
+
+    <div class="section">
+        <h2>🎯 Executive Summary</h2>
+        <p>SafeRide AI is an advanced <strong>Flutter-based mobile application</strong> that transforms any smartphone, tablet, or <strong>embedded camera system</strong> into an intelligent <strong>in-car safety monitoring system</strong>. The app uses cutting-edge AI and computer vision to provide real-time driver behavior analysis and passenger safety monitoring.</p>
+    </div>
+
+    <div class="section">
+        <h2>🚗 Core Purpose</h2>
+        <ul>
+            <li><strong>Vehicle Safety Enhancement:</strong> Continuous monitoring of driver alertness and behavior</li>
+            <li><strong>Accident Prevention:</strong> Real-time alerts for drowsiness, distraction, and unsafe driving patterns</li>
+            <li><strong>Cost-Effective Solution:</strong> Leverages existing mobile devices OR dedicated embedded camera systems</li>
+            <li><strong>Universal Compatibility:</strong> Works with any vehicle through dashboard mounting or integrated camera installation</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🧠 Key Technologies Used</h2>
+        <div class="tech-grid">
+            <div class="tech-item">
+                <h4>Mobile Development</h4>
+                <ul>
+                    <li>Flutter 3.0+ - Cross-platform framework</li>
+                    <li>Dart Programming Language</li>
+                    <li>Provider Pattern - State management</li>
+                </ul>
+            </div>
+            <div class="tech-item">
+                <h4>AI & Computer Vision</h4>
+                <ul>
+                    <li>Google ML Kit - Face detection</li>
+                    <li>468 facial landmarks analysis</li>
+                    <li>Real-time processing (15-30 FPS)</li>
+                </ul>
+            </div>
+            <div class="tech-item">
+                <h4>Hardware Integration</h4>
+                <ul>
+                    <li>Native Camera APIs</li>
+                    <li>Embedded Camera Support</li>
+                    <li>HD Video Processing</li>
+                    <li>Hardware Acceleration</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🎯 Enhanced Detection Capabilities</h2>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>Drowsiness Detection</strong> - Eye closure monitoring with fatigue analysis</li>
+                <li><strong>Driver Distraction</strong> - Head pose tracking and attention monitoring</li>
+                <li><strong>Yawning Detection</strong> - Mouth analysis for tiredness indicators</li>
+                <li><strong>Phone Usage Detection</strong> - Unsafe device usage while driving</li>
+                <li><strong>Motion Sickness Monitoring</strong> - Passenger wellness tracking</li>
+                <li><strong>Seatbelt Detection</strong> - Safety compliance monitoring</li>
+                <li><strong>Smoking Detection</strong> - Health and safety alerts</li>
+                <li><strong>Erratic Movement Detection</strong> - Unusual behavior patterns</li>
+                <li><strong>Environmental Awareness</strong> - Lighting adaptation, weather conditions</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>📱 Enhanced Camera Solutions</h2>
+        <h3>Mobile Device Integration</h3>
+        <ul>
+            <li><strong>Smartphone/Tablet Mounting</strong> - Dashboard or windshield installation</li>
+            <li><strong>Existing Hardware Utilization</strong> - Cost-effective immediate deployment</li>
+            <li><strong>Portable Solution</strong> - Transferable between vehicles</li>
+        </ul>
+
+        <h3>Embedded Camera Enhancement</h3>
+        <ul>
+            <li><strong>Dedicated Automotive Cameras</strong> - Purpose-built for vehicle integration</li>
+            <li><strong>OEM Integration</strong> - Direct vehicle manufacturer installation</li>
+            <li><strong>Advanced Optics</strong> - Wide-angle lens, night vision, infrared capabilities</li>
+            <li><strong>Weather Resistance</strong> - IP67-rated durability for harsh conditions</li>
+            <li><strong>Professional Installation</strong> - Permanent, clean integration with vehicle systems</li>
+        </ul>
+
+        <h3>Hybrid Camera Systems</h3>
+        <ul>
+            <li><strong>Multi-Camera Arrays</strong> - Driver + passenger + exterior monitoring</li>
+            <li><strong>360° Coverage</strong> - Complete vehicle safety monitoring</li>
+            <li><strong>Redundant Systems</strong> - Backup cameras for critical safety applications</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>💼 Business Value & ROI</h2>
+        <div class="tech-grid">
+            <div class="tech-item">
+                <h4>Deployment Flexibility</h4>
+                <ul>
+                    <li>Consumer Market: Mobile apps</li>
+                    <li>Enterprise Fleet: Embedded cameras</li>
+                    <li>OEM Partnership: Vehicle integration</li>
+                    <li>Aftermarket Solutions: Professional installation</li>
+                </ul>
+            </div>
+            <div class="tech-item">
+                <h4>Scalable ROI</h4>
+                <ul>
+                    <li>Immediate Implementation: Mobile deployment</li>
+                    <li>Long-term Enhancement: Embedded upgrades</li>
+                    <li>Insurance Benefits: Reduced premiums</li>
+                    <li>Fleet Optimization: Behavior analytics</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>📊 Technical Specifications</h2>
+        <h3>Performance Metrics</h3>
+        <ul>
+            <li><strong>Real-Time Processing:</strong> &lt;100ms detection latency</li>
+            <li><strong>High Accuracy:</strong> Advanced ML algorithms with configurable sensitivity</li>
+            <li><strong>Power Optimized:</strong> Efficient operation for both mobile and embedded systems</li>
+            <li><strong>24/7 Operation:</strong> Designed for continuous vehicle monitoring</li>
+            <li><strong>Enhanced Reliability:</strong> Embedded cameras provide superior stability</li>
+        </ul>
+
+        <h3>Privacy & Security</h3>
+        <ul>
+            <li><strong>100% On-Device Processing</strong> - No cloud dependency or data transmission</li>
+            <li><strong>Local Data Storage</strong> - All recordings and statistics stored locally</li>
+            <li><strong>Privacy-First Design</strong> - Complete user control over personal data</li>
+            <li><strong>Offline Operation</strong> - Works without internet connectivity</li>
+            <li><strong>Embedded Security</strong> - Hardware-level encryption for embedded systems</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🌐 Deployment Options</h2>
+        <div class="highlight-box">
+            <h3>Mobile Solutions</h3>
+            <ul>
+                <li><strong>iOS/Android Apps</strong> - Consumer-friendly mobile applications</li>
+                <li><strong>Web Interface</strong> - Browser-based fleet management</li>
+            </ul>
+
+            <h3>Embedded Camera Systems</h3>
+            <ul>
+                <li><strong>Automotive-Grade Hardware</strong> - Temperature-resistant, vibration-proof</li>
+                <li><strong>Direct Vehicle Integration</strong> - CAN bus connectivity, power management</li>
+                <li><strong>Professional Installation</strong> - Certified technician deployment</li>
+                <li><strong>OEM Compatibility</strong> - Works with existing vehicle electronics</li>
+            </ul>
+
+            <h3>Hybrid Deployments</h3>
+            <ul>
+                <li><strong>Gradual Migration</strong> - Start with mobile, upgrade to embedded</li>
+                <li><strong>Multi-Vehicle Fleets</strong> - Mix of mobile and embedded solutions</li>
+                <li><strong>Cost-Optimized Scaling</strong> - Right solution for each vehicle type</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="conclusion">
+        SafeRide AI delivers enterprise-grade vehicle safety monitoring through both consumer-friendly mobile technology AND professional embedded camera systems, making advanced AI-powered safety features accessible and scalable for any application - from personal vehicles to large commercial fleets.
+    </div>
+
+    <div class="footer">
+        <p><strong>Contact Information:</strong></p>
+        <p>Email: info@saferideai.com | Website: www.saferideai.com</p>
+        <p>Project Repository: github.com/sarikamunirajumca/saferideAI</p>
+        <p>Document Generated: August 2025 | Version: 1.0</p>
+    </div>
+</body>
+</html>
+''';
+
+  // Write HTML file
+  final htmlFile = File('/Users/venkataraju/projects/saferide_ai_app/SafeRide_AI_Executive_Summary.html');
+  await htmlFile.writeAsString(htmlContent);
+  
+  print('✅ HTML file generated: ${htmlFile.path}');
+  print('📄 You can now:');
+  print('   1. Open the HTML file in a browser and print to PDF');
+  print('   2. Use an online HTML-to-PDF converter');
+  print('   3. Use Chrome headless: chrome --headless --print-to-pdf=output.pdf ${htmlFile.path}');
+  
+  // Also create a simple markdown version
+  final markdownContent = '''# SafeRide AI - Executive Summary
+**Advanced In-Car Safety Monitoring System**
+
+---
+
+## 🎯 Executive Summary
+
+SafeRide AI is an advanced **Flutter-based mobile application** that transforms any smartphone, tablet, or **embedded camera system** into an intelligent **in-car safety monitoring system**. The app uses cutting-edge AI and computer vision to provide real-time driver behavior analysis and passenger safety monitoring.
+
+---
+
+## 🚗 Core Purpose
+
+- **Vehicle Safety Enhancement**: Continuous monitoring of driver alertness and behavior
+- **Accident Prevention**: Real-time alerts for drowsiness, distraction, and unsafe driving patterns
+- **Cost-Effective Solution**: Leverages existing mobile devices OR dedicated embedded camera systems
+- **Universal Compatibility**: Works with any vehicle through dashboard mounting or integrated camera installation
+
+---
+
+## 🧠 Key Technologies Used
+
+### Mobile Development
+- **Flutter 3.0+** - Cross-platform framework (iOS/Android/Web)
+- **Dart Programming Language** - High-performance, reactive programming
+- **Provider Pattern** - Efficient state management and real-time updates
+
+### AI & Computer Vision
+- **Google ML Kit** - On-device face detection with 468 facial landmarks
+- **Real-time Image Processing** - 15-30 FPS analysis for optimal performance
+- **Advanced Algorithms**: Eye Aspect Ratio (EAR), Head Pose Estimation, Mouth Aspect Ratio (MAR)
+
+### Hardware Integration
+- **Native Camera APIs** - Direct integration with device cameras
+- **Embedded Camera Support** - Compatible with dedicated automotive camera modules
+- **HD Video Processing** - 720p/1080p real-time analysis capabilities
+- **Hardware Acceleration** - GPU-optimized processing for embedded systems
+
+---
+
+## 🎯 Enhanced Detection Capabilities
+
+- **Drowsiness Detection** - Eye closure monitoring with fatigue analysis
+- **Driver Distraction** - Head pose tracking and attention monitoring
+- **Yawning Detection** - Mouth analysis for tiredness indicators
+- **Phone Usage Detection** - Unsafe device usage while driving
+- **Motion Sickness Monitoring** - Passenger wellness tracking
+- **Seatbelt Detection** - Safety compliance monitoring
+- **Smoking Detection** - Health and safety alerts
+- **Erratic Movement Detection** - Unusual behavior patterns
+- **Environmental Awareness** - Lighting adaptation, weather condition monitoring
+
+---
+
+## 📱 Enhanced Camera Solutions
+
+### Mobile Device Integration
+- **Smartphone/Tablet Mounting** - Dashboard or windshield installation
+- **Existing Hardware Utilization** - Cost-effective immediate deployment
+- **Portable Solution** - Transferable between vehicles
+
+### Embedded Camera Enhancement
+- **Dedicated Automotive Cameras** - Purpose-built for vehicle integration
+- **OEM Integration** - Direct vehicle manufacturer installation
+- **Advanced Optics** - Wide-angle lens, night vision, infrared capabilities
+- **Weather Resistance** - IP67-rated durability for harsh conditions
+- **Professional Installation** - Permanent, clean integration with vehicle systems
+
+### Hybrid Camera Systems
+- **Multi-Camera Arrays** - Driver + passenger + exterior monitoring
+- **360° Coverage** - Complete vehicle safety monitoring
+- **Redundant Systems** - Backup cameras for critical safety applications
+
+---
+
+## 💼 Business Value & ROI
+
+### Deployment Flexibility
+- **Consumer Market**: Mobile app for personal vehicles
+- **Enterprise Fleet**: Embedded camera systems for commercial vehicles
+- **OEM Partnership**: Integration with vehicle manufacturers
+- **Aftermarket Solutions**: Professional installation services
+
+### Scalable ROI
+- **Immediate Implementation**: Mobile device deployment
+- **Long-term Enhancement**: Embedded camera upgrades
+- **Insurance Benefits**: Reduced premiums for monitored vehicles
+- **Fleet Optimization**: Comprehensive driver behavior analytics
+
+---
+
+## 📊 Technical Specifications
+
+### Performance Metrics
+- **Real-Time Processing**: <100ms detection latency
+- **High Accuracy**: Advanced ML algorithms with configurable sensitivity
+- **Power Optimized**: Efficient operation for both mobile and embedded systems
+- **24/7 Operation**: Designed for continuous vehicle monitoring
+- **Enhanced Reliability**: Embedded cameras provide superior stability
+
+### Privacy & Security
+- **100% On-Device Processing** - No cloud dependency or data transmission
+- **Local Data Storage** - All recordings and statistics stored locally
+- **Privacy-First Design** - Complete user control over personal data
+- **Offline Operation** - Works without internet connectivity
+- **Embedded Security** - Hardware-level encryption for embedded camera systems
+
+---
+
+## 🌐 Deployment Options
+
+### Mobile Solutions
+- **iOS/Android Apps** - Consumer-friendly mobile applications
+- **Web Interface** - Browser-based fleet management
+
+### Embedded Camera Systems
+- **Automotive-Grade Hardware** - Temperature-resistant, vibration-proof
+- **Direct Vehicle Integration** - CAN bus connectivity, power management
+- **Professional Installation** - Certified technician deployment
+- **OEM Compatibility** - Works with existing vehicle electronics
+
+### Hybrid Deployments
+- **Gradual Migration** - Start with mobile, upgrade to embedded
+- **Multi-Vehicle Fleets** - Mix of mobile and embedded solutions
+- **Cost-Optimized Scaling** - Right solution for each vehicle type
+
+---
+
+## 🎯 Conclusion
+
+**SafeRide AI delivers enterprise-grade vehicle safety monitoring through both consumer-friendly mobile technology AND professional embedded camera systems, making advanced AI-powered safety features accessible and scalable for any application - from personal vehicles to large commercial fleets.**
+
+---
+
+**Contact Information:**
+- Email: info@saferideai.com
+- Website: www.saferideai.com
+- Project Repository: github.com/sarikamunirajumca/saferideAI
+
+---
+*Document Generated: August 2025*
+*Version: 1.0*
+''';
+
+  final markdownFile = File('/Users/venkataraju/projects/saferide_ai_app/SafeRide_AI_Executive_Summary.md');
+  await markdownFile.writeAsString(markdownContent);
+  
+  print('✅ Markdown file generated: ${markdownFile.path}');
+  print('');
+  print('🚀 Next Steps:');
+  print('   • Open HTML file in Chrome and print to PDF');
+  print('   • Use online converter: https://md-to-pdf.fly.dev/');
+  print('   • Or use any Markdown to PDF converter');
+  print('');
+  print('📧 Files ready for email attachment!');
+}
+
+void main() async {
+  await generateSafeRideAIPDF();
+}

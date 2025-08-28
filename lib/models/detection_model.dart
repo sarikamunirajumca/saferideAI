@@ -60,6 +60,12 @@ class DetectionStats {
     }
   }
   
+  int getTotalDetections() {
+    return drowsinessDetections + distractionDetections + noSeatbeltDetections +
+           yawningDetections + passengerDisturbanceDetections + motionSicknessDetections +
+           phoneUsageDetections + smokingDetections + erraticMovementDetections;
+  }
+  
   Map<String, dynamic> toJson() {
     return {
       'drowsinessDetections': drowsinessDetections,
@@ -98,6 +104,13 @@ class DetectionHistory {
   
   List<DetectionResult> getDetectionsOfType(DetectionType type) {
     return detections.where((detection) => detection.type == type).toList();
+  }
+  
+  List<DetectionResult> get recentDetections {
+    // Return last 10 detections, sorted by timestamp (newest first)
+    final sortedDetections = List<DetectionResult>.from(detections);
+    sortedDetections.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return sortedDetections.take(10).toList();
   }
   
   void clearHistory() {

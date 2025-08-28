@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:saferide_ai_app/screens/splash_screen.dart';
+import 'package:saferide_ai_app/screens/login_screen.dart';
+import 'package:saferide_ai_app/screens/multi_user_admin_dashboard.dart';
+import 'package:saferide_ai_app/screens/detection_screen_auto.dart';
+import 'package:saferide_ai_app/screens/analytics_screen.dart';
+import 'package:saferide_ai_app/screens/profile_management_screen.dart';
+import 'package:saferide_ai_app/screens/emergency_screen.dart';
 import 'package:saferide_ai_app/services/camera_service.dart';
 import 'package:saferide_ai_app/services/detection_service.dart';
 import 'package:saferide_ai_app/utils/constants.dart';
@@ -30,8 +35,16 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: _buildLightTheme(),
         darkTheme: _buildDarkTheme(),
-        themeMode: ThemeMode.dark, // Force dark theme for the modern design
-        home: const SplashScreen(),
+        themeMode: ThemeMode.dark,
+        initialRoute: '/login',
+        routes: {
+          '/login': (context) => const LoginScreen(),
+          '/admin_dashboard': (context) => const MultiUserAdminDashboard(),
+          '/detection': (context) => const DetectionScreenAuto(),
+          '/analytics': (context) => const AnalyticsScreen(),
+          '/profiles': (context) => const ProfileManagementScreen(),
+          '/emergency': (context) => const EmergencyScreen(),
+        },
       ),
     );
   }
@@ -89,7 +102,7 @@ class MyApp extends StatelessWidget {
           color: AppConstants.textSecondary,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppConstants.surfaceDark,
         elevation: 0,
         shape: RoundedRectangleBorder(

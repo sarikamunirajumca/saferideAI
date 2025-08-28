@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run SafeRide AI on Mobile",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"run",
+				"-d",
+				"V2207"
+			],
+			"group": "build",
+			"isBackground": true
+		}
+	]
+}

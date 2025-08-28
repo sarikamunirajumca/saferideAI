@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRide AI - Remote Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0A0E1A, #1E2A3A);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(10px);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #3B82F6;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10B981;
+            border-radius: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10B981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            gap: 2rem;
+        }
+        
+        .video-container {
+            position: relative;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            width: 95vw;
+            height: 60vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .connection-setup {
+            text-align: center;
+            max-width: 600px;
+        }
+        
+        .connection-setup h2 {
+            color: #3B82F6;
+            margin-bottom: 1rem;
+        }
+        
+        .session-input {
+            display: flex;
+            gap: 1rem;
+            margin: 2rem 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .session-input input {
+            padding: 0.75rem;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 0.5rem;
+            background: rgba(30, 42, 58, 0.6);
+            color: white;
+            font-size: 1rem;
+            min-width: 300px;
+        }
+        
+        .session-input input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .session-input button {
+            padding: 0.75rem 1.5rem;
+            background: #3B82F6;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .session-input button:hover {
+            background: #2563EB;
+        }
+        
+        .instructions {
+            background: rgba(30, 42, 58, 0.6);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .instructions h3 {
+            color: #3B82F6;
+            margin-bottom: 1rem;
+        }
+        
+        .instructions ol {
+            margin-left: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        .instructions li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .stream-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .stream-placeholder .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .error-message {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #EF4444;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #FCA5A5;
+        }
+        
+        .success-message {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10B981;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #6EE7B7;
+        }
+        
+        .video-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .session-input {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .session-input input {
+                min-width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            🛡️ SafeRide AI Remote Monitor
+        </div>
+        <div class="status" id="connectionStatus">
+            <div class="status-dot"></div>
+            SEARCHING FOR STREAM
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="video-container">
+            <div class="stream-placeholder" id="streamPlaceholder">
+                <div class="icon">📹</div>
+                <h3>Waiting for Vehicle Connection</h3>
+                <p>Enter session ID below to connect to vehicle stream</p>
+            </div>
+            <canvas id="videoCanvas" style="display: none; width: 100%; height: 100%;"></canvas>
+        </div>
+        
+        <div class="connection-setup">
+            <h2>Connect to Vehicle Stream</h2>
+            <p>Enter the session ID provided by the SafeRide AI app on the vehicle</p>
+            
+            <div class="session-input">
+                <input 
+                    type="text" 
+                    id="sessionIdInput" 
+                    placeholder="Enter session ID (e.g., 550e8400-e29b-41d4-a716-446655440000)"
+                >
+                <button onclick="connectToStream()">Connect</button>
+            </div>
+            
+            <div id="messageContainer"></div>
+            
+            <div class="instructions">
+                <h3>How to Connect:</h3>
+                <ol>
+                    <li>Open the SafeRide AI app on the vehicle's mobile device</li>
+                    <li>Start the detection/monitoring system</li>
+                    <li>The app will display a session ID for remote monitoring</li>
+                    <li>Enter that session ID above and click "Connect"</li>
+                    <li>You'll see the live video feed from the vehicle</li>
+                </ol>
+            </div>
+            
+            <div class="instructions">
+                <h3>Alternative Connection Methods:</h3>
+                <ol>
+                    <li><strong>QR Code:</strong> Scan the QR code displayed in the vehicle app</li>
+                    <li><strong>Direct URL:</strong> Use the complete streaming URL if provided</li>
+                    <li><strong>Auto-detection:</strong> This page will automatically detect streams from your organization</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let websocket = null;
+        let currentSessionId = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        
+        // WebSocket servers to try
+        const webSocketServers = [
+            'wss://ws.postman-echo.com/raw',
+            'wss://echo.websocket.org',
+            'wss://socketsbay.com/wss/v2/1/demo/'
+        ];
+        
+        let currentServerIndex = 0;
+        
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.textContent = message;
+            
+            container.innerHTML = '';
+            container.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                if (container.contains(messageDiv)) {
+                    container.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+        
+        function updateConnectionStatus(status, isConnected = false) {
+            const statusElement = document.getElementById('connectionStatus');
+            const statusDot = statusElement.querySelector('.status-dot');
+            
+            statusElement.innerHTML = `<div class="status-dot"></div>${status}`;
+            
+            if (isConnected) {
+                statusElement.style.background = 'rgba(16, 185, 129, 0.2)';
+                statusElement.style.borderColor = '#10B981';
+                statusElement.querySelector('.status-dot').style.background = '#10B981';
+            } else {
+                statusElement.style.background = 'rgba(239, 68, 68, 0.2)';
+                statusElement.style.borderColor = '#EF4444';
+                statusElement.querySelector('.status-dot').style.background = '#EF4444';
+            }
+        }
+        
+        function connectToStream() {
+            const sessionId = document.getElementById('sessionIdInput').value.trim();
+            
+            if (!sessionId) {
+                showMessage('Please enter a session ID', 'error');
+                return;
+            }
+            
+            if (sessionId.length < 10) {
+                showMessage('Session ID appears to be too short', 'error');
+                return;
+            }
+            
+            currentSessionId = sessionId;
+            showMessage(`Connecting to session: ${sessionId}`);
+            updateConnectionStatus('CONNECTING...');
+            
+            connectWebSocket();
+        }
+        
+        function connectWebSocket() {
+            if (websocket) {
+                websocket.close();
+            }
+            
+            const serverUrl = webSocketServers[currentServerIndex];
+            updateConnectionStatus(`CONNECTING TO ${serverUrl.split('//')[1].split('/')[0].toUpperCase()}...`);
+            
+            try {
+                websocket = new WebSocket(serverUrl);
+                
+                websocket.onopen = function() {
+                    console.log('WebSocket connected to:', serverUrl);
+                    updateConnectionStatus('CONNECTED - WAITING FOR STREAM', true);
+                    reconnectAttempts = 0;
+                    
+                    // Send connection request
+                    const message = {
+                        type: 'admin_connect',
+                        sessionId: currentSessionId,
+                        timestamp: new Date().toISOString(),
+                        userAgent: navigator.userAgent
+                    };
+                    
+                    websocket.send(JSON.stringify(message));
+                    showMessage('Connected to streaming server. Waiting for vehicle stream...');
+                };
+                
+                websocket.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleStreamMessage(data);
+                    } catch (e) {
+                        console.log('Received non-JSON message:', event.data);
+                    }
+                };
+                
+                websocket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    showMessage('Connection error. Trying next server...', 'error');
+                    tryNextServer();
+                };
+                
+                websocket.onclose = function() {
+                    console.log('WebSocket disconnected');
+                    updateConnectionStatus('DISCONNECTED');
+                    
+                    if (reconnectAttempts < maxReconnectAttempts && currentSessionId) {
+                        setTimeout(() => {
+                            reconnectAttempts++;
+                            showMessage(`Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                            connectWebSocket();
+                        }, 2000 * reconnectAttempts);
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Failed to connect to WebSocket:', error);
+                tryNextServer();
+            }
+        }
+        
+        function tryNextServer() {
+            currentServerIndex = (currentServerIndex + 1) % webSocketServers.length;
+            
+            if (currentServerIndex === 0) {
+                reconnectAttempts++;
+                if (reconnectAttempts >= maxReconnectAttempts) {
+                    showMessage('Unable to connect to streaming servers. Please check your internet connection.', 'error');
+                    updateConnectionStatus('CONNECTION FAILED');
+                    return;
+                }
+            }
+            
+            setTimeout(() => {
+                connectWebSocket();
+            }, 1000);
+        }
+        
+        function handleStreamMessage(data) {
+            switch (data.type) {
+                case 'video_frame':
+                    if (data.sessionId === currentSessionId) {
+                        displayVideoFrame(data);
+                        updateConnectionStatus('LIVE STREAMING', true);
+                    }
+                    break;
+                    
+                case 'stream_started':
+                    showMessage('Vehicle stream started!');
+                    break;
+                    
+                case 'stream_ended':
+                    showMessage('Vehicle stream ended');
+                    document.getElementById('streamPlaceholder').style.display = 'flex';
+                    document.getElementById('videoCanvas').style.display = 'none';
+                    break;
+                    
+                case 'error':
+                    showMessage(`Stream error: ${data.message}`, 'error');
+                    break;
+                    
+                case 'pong':
+                    // Keep-alive response
+                    break;
+                    
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        }
+        
+        function displayVideoFrame(frameData) {
+            try {
+                const canvas = document.getElementById('videoCanvas');
+                const ctx = canvas.getContext('2d');
+                const placeholder = document.getElementById('streamPlaceholder');
+                
+                // Show canvas, hide placeholder
+                placeholder.style.display = 'none';
+                canvas.style.display = 'block';
+                
+                // Decode base64 image data
+                const imageData = frameData.frameData;
+                const img = new Image();
+                
+                img.onload = function() {
+                    // Set canvas size to match container
+                    const container = canvas.parentElement;
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                    
+                    // Draw image to canvas, maintaining aspect ratio
+                    const aspectRatio = img.width / img.height;
+                    const canvasAspectRatio = canvas.width / canvas.height;
+                    
+                    let drawWidth, drawHeight, drawX, drawY;
+                    
+                    if (aspectRatio > canvasAspectRatio) {
+                        drawWidth = canvas.width;
+                        drawHeight = canvas.width / aspectRatio;
+                        drawX = 0;
+                        drawY = (canvas.height - drawHeight) / 2;
+                    } else {
+                        drawWidth = canvas.height * aspectRatio;
+                        drawHeight = canvas.height;
+                        drawX = (canvas.width - drawWidth) / 2;
+                        drawY = 0;
+                    }
+                    
+                    // Clear canvas and draw image
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                };
+                
+                img.src = 'data:image/bmp;base64,' + imageData;
+                
+            } catch (error) {
+                console.error('Error displaying video frame:', error);
+                showMessage('Error displaying video frame', 'error');
+            }
+        }
+        
+        // Auto-connect if session ID is in URL
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session') || urlParams.get('id');
+            
+            if (sessionId) {
+                document.getElementById('sessionIdInput').value = sessionId;
+                connectToStream();
+            }
+            
+            // Parse session from URL path
+            const pathParts = window.location.pathname.split('/');
+            const pathSessionId = pathParts[pathParts.length - 1];
+            if (pathSessionId && pathSessionId.length > 10) {
+                document.getElementById('sessionIdInput').value = pathSessionId;
+                connectToStream();
+            }
+        };
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const canvas = document.getElementById('videoCanvas');
+            if (canvas.style.display !== 'none') {
+                // Trigger a redraw with the current frame
+                const container = canvas.parentElement;
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            }
+        });
+        
+        // Send periodic ping to keep connection alive
+        setInterval(function() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                const pingMessage = {
+                    type: 'ping',
+                    sessionId: currentSessionId,
+                    timestamp: new Date().toISOString()
+                };
+                websocket.send(JSON.stringify(pingMessage));
+            }
+        }, 30000); // Every 30 seconds
+    </script>
+</body>
+</html>
